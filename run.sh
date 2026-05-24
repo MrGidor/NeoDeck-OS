@@ -1,30 +1,44 @@
 #!/bin/bash
 
-# 1. Update the toolchain path
 export PATH=$PATH:/usr/local/i386elfgcc/bin
 
-# 2. Ensure the Binaries output directory exists
 mkdir -p Binaries
 
-# 3. Assemble the bootloader
 nasm "bootloader/boot.asm" -f bin -o "Binaries/boot.bin"
 
-# 4. Compile the kernel components
 nasm "kernel/kernel_entry.asm" -f elf -o "Binaries/kernel_entry.o"
-i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel.cpp" -o "Binaries/kernel.o"
 
-# 5. Link the kernel into a flat binary at 0x1000
-i386-elf-ld -o "Binaries/full_kernel.bin" -Ttext 0x1000 "Binaries/kernel_entry.o" "Binaries/kernel.o" --oformat binary
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/main.cpp" -o "Binaries/main.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/idt.cpp" -o "Binaries/idt.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/shell.cpp" -o "Binaries/shell.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/paging.cpp" -o "Binaries/paging.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/terminal.cpp" -o "Binaries/terminal.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/io.cpp" -o "Binaries/io.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/pic.cpp" -o "Binaries/pic.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/ata.cpp" -o "Binaries/ata.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/memory/memory.cpp" -o "Binaries/memory.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/fs/neofs.cpp" -o "Binaries/neofs.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/shell/string.cpp" -o "Binaries/string.o"
 
-# 6. Stitch the bootloader and kernel together
+i386-elf-ld -T linker.ld -o "Binaries/full_kernel.bin" \
+    "Binaries/kernel_entry.o" \
+    "Binaries/main.o" \
+    "Binaries/idt.o" \
+    "Binaries/shell.o" \
+    "Binaries/paging.o" \
+    "Binaries/terminal.o" \
+    "Binaries/io.o" \
+    "Binaries/pic.o" \
+    "Binaries/ata.o" \
+    "Binaries/memory.o" \
+    "Binaries/neofs.o" \
+    "Binaries/string.o" \
+    --oformat binary
+
 cat "Binaries/boot.bin" "Binaries/full_kernel.bin" > "Binaries/OS.bin"
 
-# 7. Dynamically pad the boot image to a standard 1.44MB floppy disk size
 truncate -s 1440k "Binaries/OS.bin"
 
-# 8. Generate a completely separate 10MB blank hard drive for NeoFS!
-# 'seek=10M' allocates it instantly without hogging host disk space until used
 dd if=/dev/zero of="Binaries/hdd.img" bs=1 count=0 seek=10M 2>/dev/null
 
-# 9. Run QEMU with the Floppy OS as boot source, AND the 10MB Virtual HDD as Master IDE
 qemu-system-i386 -fda "Binaries/OS.bin" -drive format=raw,file="Binaries/hdd.img",bus=0,unit=0,media=disk -m 128M
