@@ -5,12 +5,19 @@ typedef unsigned int   uint32_t;
 #define VGA_COLS 80
 #define VGA_ROWS 25
 #define VGA_ADDRESS 0xB8000
+// Status Theme Palettes (Format: Foreground | (Background << 4))
+
 #define DEFAULT_COLOR 0x0F // White text on black background
+#define COLOR_SUCCESS  0x0A  // Bright Green on Black
+#define COLOR_WARNING  0x0E  // Yellow on Black
+#define COLOR_ERROR    0x0C  // Bright Red on Black
+#define COLOR_INFO     0x0B  // Light Cyan on Black
 
 // Global state for our terminal layout
 volatile char* video_memory = (volatile char*)VGA_ADDRESS;
 int terminal_column = 0;
 int terminal_row = 0;
+uint8_t terminal_color = 0x0F;
 
 #define NULL 0
 
@@ -176,7 +183,7 @@ void terminal_put_char(char c) {
     } else {
         int index = (terminal_row * VGA_COLS + terminal_column) * 2;
         video_memory[index]     = c;
-        video_memory[index + 1] = DEFAULT_COLOR;
+        video_memory[index + 1] = terminal_color;
         terminal_column++;
     }
     if (terminal_column >= VGA_COLS) {
@@ -194,8 +201,21 @@ void kprint(const char* str) {
         terminal_put_char(*str);
         str++;
     }
-
 }
+
+// Prints text in a specific color, then restores the system default
+void kprint_color(const char* str, uint8_t color) {
+    uint8_t old_color = terminal_color; // Save whatever color the terminal was using
+    terminal_color = color;             // Switch to our contextual color
+    kprint(str);                        // Print the string using existing logic
+    terminal_color = old_color;         // Restore previous color immediately
+}
+
+// Context-specific wrapper functions for clean code reading
+void kprint_success(const char* str) { kprint_color(str, COLOR_SUCCESS); }
+void kprint_warning(const char* str) { kprint_color(str, COLOR_WARNING); }
+void kprint_error(const char* str)   { kprint_color(str, COLOR_ERROR);   }
+void kprint_info(const char* str)    { kprint_color(str, COLOR_INFO);    }
 
 // ----------------------
 // I/O Port Communication and PIC Remapping
@@ -710,8 +730,8 @@ void neodeck_meminfo() {
     uint32_t used_heap_bytes  = used_blocks * BLOCK_SIZE;
     uint32_t free_heap_bytes  = total_heap_bytes - used_heap_bytes;
 
-    kprint("NeoDeck Heap Memory Diagnostics:\n");
-    kprint("  Total Heap Space: ");
+    kprint_info("NeoDeck Heap Memory Diagnostics:\n");
+    kprint_info("  Total Heap Space: ");
     
     // inline base-10 number string converter
     auto kprint_int = [](uint32_t num) {
@@ -813,9 +833,9 @@ void parse_command(const char* cmd) {
         else neofs_cat(filename);
     }
     else {
-        kprint("NeoDeck Error: Command '");
+        kprint_error("NeoDeck Error: Command '");
         kprint(cmd);
-        kprint("' not recognized.\n");
+        kprint_error("' not recognized.\n");
     }
 
     // --- REPRINT PROMPT (Dynamic Path Style) ---
@@ -897,10 +917,10 @@ void idt_init() {
 }
 
 extern "C" void isr0_handler() {
-    kprint("\n========================================\n");
-    kprint(" CRITICAL KERNEL EXCEPTION: DIVIDE BY 0 \n");
-    kprint(" System Execution Halted to Protect Data.\n");
-    kprint("========================================\n");
+    kprint_error("\n========================================\n");
+    kprint_error(" CRITICAL KERNEL EXCEPTION: DIVIDE BY 0 \n");
+    kprint_error(" System Execution Halted to Protect Data.\n");
+    kprint_error("========================================\n");
     asm volatile("cli; hlt");
 }
 
@@ -943,21 +963,22 @@ extern "C" void main() {
         allocation_bitmap[i] = 0;
 
     kprint("Booting NeoDeck...\n");
-    kprint("Memory allocation bitmap safely initialized.\n");
+    kprint_info("Memory allocation bitmap safely initialized.\n");
 
     idt_init();
     pic_remap(); 
-    kprint("PIC and hardware registers configured successfully.\n");
+    kprint_info("PIC and hardware registers configured successfully.\n");
 
-    kprint("Initializing 4MB identity paging map...\n");
+    kprint_info("Initializing 4MB identity paging map...\n");
     paging_init();
 
-    kprint("Enabling CPU Memory Management Unit (MMU)...\n");
+    kprint_info("Enabling CPU Memory Management Unit (MMU)...\n");
     enable_paging(PAGE_DIRECTORY_ADDRESS);
-    kprint("Virtual memory architecture operational!\n");
+    kprint_info("Virtual memory architecture operational!\n");
 
     asm volatile("sti");
-    kprint("System ready. Type 'help' for a list of supported commands.\n\n/> ");
+    kprint_info("System ready. Type 'help' for a list of supported commands.\n");
+    kprint("\n/> ");
 
     while(1) { 
         asm volatile("hlt");
