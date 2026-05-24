@@ -12,6 +12,14 @@ typedef unsigned int   uint32_t;
 
 int current_directory_inode = 0;
 
+void neofs_init() {
+    current_directory_inode = 0; // Explicitly snap tracking back to root on boot
+    
+    // Warm up the disk cache by reading the table once
+    alignas(4) uint8_t startup_buffer[512];
+    ata_read_sector(INODE_TABLE_SECTOR, startup_buffer);
+}
+
 void neofs_ls() {
     uint8_t sector_buffer[512];
     uint8_t inode_buffer[512];
@@ -211,33 +219,66 @@ void neofs_write(const char* filename, const char* text) {
     }
 
     if (target_inode == -1 || inodes[target_inode].type != TYPE_FILE) {
-        kprint("NeoFS Error: File not found.\n");
+        kprint_error("NeoFS Error: File not found.\n");
         return;
     }
 
-    uint8_t* data_block = (uint8_t*)kmalloc(32);
-    
+    uint32_t total_len = 0;
+    while (text[total_len] != '\0') {
+        total_len++;
+    }
+
+    if (total_len == 0) {
+        kprint_warning("NeoFS Warning: Empty text payload. Writing blank file.\n");
+    }
+
+    uint8_t* data_block = (uint8_t*)kmalloc(32); // 32 blocks * 16 bytes = 512 bytes
     if (data_block == NULL) {
-        kprint("NeoFS Error: Out of heap memory! kmalloc failed.\n");
+        kprint_error("NeoFS Error: Out of heap memory! kmalloc failed.\n");
         return;
     }
 
-    for (int i = 0; i < 512; i++) data_block[i] = 0;
+    uint32_t bytes_written = 0;
+    uint32_t current_sector = inodes[target_inode].start_sector;
 
-    int size = 0;
-    while (text[size] != '\0' && size < 512) {
-        data_block[size] = text[size];
-        size++;
+    // THE CHAINING LOOP: Process data in 508-byte increments
+    while (bytes_written < total_len || total_len == 0) {
+        for (int i = 0; i < 512; i++) data_block[i] = 0;
+
+        // Fill up to 508 bytes of pure text data
+        uint32_t chunk_size = (total_len - bytes_written > 508) ? 508 : (total_len - bytes_written);
+        for (uint32_t i = 0; i < chunk_size; i++) {
+            data_block[i] = text[bytes_written + i];
+        }
+        bytes_written += chunk_size;
+
+        uint32_t next_sector = 0xFFFFFFFF;
+
+        if (bytes_written < total_len) {
+            next_sector = neofs_find_free_sector(); // (Ensure you include this helper function)
+            if (next_sector == 0) {
+                kprint_error("NeoFS Error: Disk storage capacity full!\n");
+                return;
+            }
+        }
+
+        uint32_t* next_sector_link = (uint32_t*)&data_block[508];
+        *next_sector_link = next_sector;
+
+        ata_write_sector(current_sector, data_block);
+
+        current_sector = next_sector;
+
+        if (total_len == 0) break;
     }
 
     ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
     inodes = (neofs_inode*)sector_buffer;
-    inodes[target_inode].size = size;
+    inodes[target_inode].size = total_len;
 
     ata_write_sector(INODE_TABLE_SECTOR, sector_buffer);              
-    ata_write_sector(inodes[target_inode].start_sector, data_block);  
 
-    kprint("Committed data to disk storage via Kernel Heap.\n");
+    kprint_success("Committed large payload to multi-sector storage chain.\n");
 }
 
 void neofs_cat(const char* filename) {
@@ -260,18 +301,34 @@ void neofs_cat(const char* filename) {
     }
 
     if (target_inode == -1 || inodes[target_inode].type != TYPE_FILE) {
-        kprint("NeoFS Error: File not found.\n");
+        kprint_error("NeoFS Error: File not found.\n");
         return;
     }
 
+    uint32_t current_sector = inodes[target_inode].start_sector;
+    uint32_t total_bytes_left = inodes[target_inode].size;
+
+    if (total_bytes_left == 0) {
+        kprint_info("(Empty File)\n");
+        return;
+    }
+
+    // STREAM THE CHAIN Walk through sectors until we run out of bytes or hit EOF marker
     uint8_t data_block[512];
-    ata_read_sector(inodes[target_inode].start_sector, data_block);
+    while (current_sector != 0xFFFFFFFF && total_bytes_left > 0) {
+        ata_read_sector(current_sector, data_block);
 
-    uint32_t file_size = inodes[target_inode].size;
-    if (file_size > 511) file_size = 511;
-    data_block[file_size] = '\0';
+        uint32_t bytes_to_print = (total_bytes_left > 508) ? 508 : total_bytes_left;
 
-    kprint((const char*)data_block);
+        for (uint32_t i = 0; i < bytes_to_print; i++) {
+            terminal_put_char((char)data_block[i]);
+        }
+
+        total_bytes_left -= bytes_to_print;
+
+        uint32_t* next_sector_ptr = (uint32_t*)&data_block[508];
+        current_sector = *next_sector_ptr;
+    }
     kprint("\n");
 }
 
@@ -301,4 +358,23 @@ void neofs_format() {
     neofs_mkdir("tmp");
     neofs_touch("readme.txt");
     neofs_write("readme.txt", "Welcome to NeoDeck OS! This is a simple text file created on the root directory of your NeoFS virtual disk. Feel free to explore the filesystem, create new directories and files, and write your own content. \n");
+}
+
+// Scans the disk's inode data region to find a free sector block
+uint32_t neofs_find_free_sector() {
+    uint8_t sector_buffer[512];
+    
+    for (uint32_t sector = 20; sector < 2000; sector++) {
+        ata_read_sector(sector, sector_buffer);
+        
+        int is_free = 1;
+        for (int i = 0; i < 512; i++) {
+            if (sector_buffer[i] != 0) {
+                is_free = 0;
+                break;
+            }
+        }
+        if (is_free) return sector;
+    }
+    return 0; // No free sector found
 }

@@ -12,6 +12,7 @@ typedef unsigned int   uint32_t;
 #include "../drivers/pic.h"
 #include "../drivers/ata.h"
 #include "../memory/memory.h"
+#include "../fs/neofs.h"
 
 extern void paging_init();
 extern "C" void enable_paging(uint32_t page_directory_address);
@@ -21,6 +22,8 @@ extern "C" void main() {
 
     for (int i = 0; i < BITMAP_SIZE / 8; i++)
         allocation_bitmap[i] = 0;
+
+    neofs_init();
 
     kprint("Booting NeoDeck...\n");
     kprint_info("Memory allocation bitmap safely initialized.\n");

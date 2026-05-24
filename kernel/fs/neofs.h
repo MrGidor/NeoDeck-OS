@@ -26,6 +26,8 @@ struct neofs_dir_entry {
     uint8_t  used;
 } __attribute__((packed));
 
+void neofs_init();
+uint32_t neofs_find_free_sector();
 void neofs_format();
 void neofs_ls();
 void neofs_cd(const char* target_name);
