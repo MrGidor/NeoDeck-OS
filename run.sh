@@ -17,6 +17,7 @@ i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/keyboard.cpp" -o "Binarie
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/io.cpp" -o "Binaries/io.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/pic.cpp" -o "Binaries/pic.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/ata.cpp" -o "Binaries/ata.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/execve.cpp" -o "Binaries/execve.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/memory/memory.cpp" -o "Binaries/memory.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/fs/neofs.cpp" -o "Binaries/neofs.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/shell/string.cpp" -o "Binaries/string.o"
@@ -37,6 +38,7 @@ i386-elf-ld -T linker.ld -o "Binaries/full_kernel.bin" \
     "Binaries/string.o" \
     "Binaries/editor.o" \
     "Binaries/keyboard.o" \
+    "Binaries/execve.o" \
     --oformat binary
 
 cat "Binaries/boot.bin" "Binaries/full_kernel.bin" > "Binaries/OS.bin"

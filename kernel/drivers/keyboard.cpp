@@ -6,13 +6,9 @@ typedef unsigned int   uint32_t;
 #include "io.h"
 
 char keyboard_get_key() {
-    // Read from the standard x86 keyboard controller port 0x64
-    // Checking if the lowest bit (0x01) is set means data is waiting
     if (inb(0x64) & 0x01) {
         uint8_t scancode = inb(0x60);
         
-        // Basic scancode-to-ASCII conversion mapping branch
-        // Customize this map based on your existing layout array!
         if (scancode == 0x01) return 27;  // ESC key
         if (scancode == 0x0E) return '\b'; // Backspace
         if (scancode == 0x1C) return '\n'; // Enter

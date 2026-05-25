@@ -12,6 +12,7 @@ typedef unsigned int   uint32_t;
 #include "../memory/memory.h"
 #include "../shell/editor.h"
 #include "../drivers/keyboard.h"
+#include "execve.h"
 
 #define COMMAND_BUFFER_SIZE 256
 char command_buffer[COMMAND_BUFFER_SIZE];
@@ -126,6 +127,9 @@ void parse_command(const char* cmd) {
     }
     else if (kstrcmp(cmd, "ls") == 0) {
         neofs_ls();
+    }
+    else if (kstrncmp(cmd, "exec ", 5) == 0) {
+        sys_exec(cmd + 5);
     }
     else if (kstrncmp(cmd, "mkdir ", 6) == 0) {
         const char* dir_name = cmd + 6;

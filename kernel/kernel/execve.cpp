@@ -1,0 +1,66 @@
+
+typedef unsigned char  uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int   uint32_t;
+
+#define NULL 0
+
+#include "../drivers/ata.h"
+#include "../fs/neofs.h"
+#include "../memory/memory.h"
+#include "../shell/string.h"
+#include "../drivers/terminal.h"
+
+typedef void (*entry_point_t)();
+
+void sys_exec(const char* filename) {
+    alignas(4) uint8_t sector_buffer[512];
+    ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
+    neofs_inode* inodes = (neofs_inode*)sector_buffer;
+
+    alignas(4) uint8_t dir_buffer[512];
+    uint32_t current_dir_sector = inodes[current_directory_inode].start_sector;
+    ata_read_sector(current_dir_sector, dir_buffer);
+    neofs_dir_entry* entries = (neofs_dir_entry*)dir_buffer;
+
+    int target_inode = -1;
+    for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
+        if (entries[i].used == 1 && kstrcmp(entries[i].name, filename) == 0) {
+            target_inode = entries[i].inode_num;
+            break;
+        }
+    }
+
+    if (target_inode == -1 || inodes[target_inode].type != TYPE_FILE) {
+        kprint_error("Exec Error: Executable binary not found.\n");
+        return;
+    }
+
+    uint32_t bin_size = inodes[target_inode].size;
+    if (bin_size == 0) {
+        kprint_error("Exec Error: Binary file is empty.\n");
+        return;
+    }
+
+    uint32_t blocks_needed = (bin_size / 16) + 1;
+    uint8_t* program_space = (uint8_t*)kmalloc(blocks_needed);
+
+    if (program_space == NULL) {
+        kprint_error("Exec Error: Failed to allocate process memory.\n");
+        return;
+    }
+
+    neofs_read_to_buffer(filename, (char*)program_space, bin_size + 1);
+
+    kprint_info("Loaded executable into memory address space. Jumping execution...\n");
+
+    // Cast the memory address to a parameterless function pointer and invoke it.
+    entry_point_t start_program = (entry_point_t)program_space;
+    
+    // The CPU jumps to app code, runs it, and returns here when finished!
+    start_program(); 
+
+    kprint_success("Process finished execution. Regaining kernel control.\n");
+    
+    // kfree(program_space); 
+}
