@@ -10,19 +10,14 @@ typedef unsigned int   uint32_t;
 #include "../shell/string.h"
 #include "../fs/neofs.h"
 #include "../memory/memory.h"
+#include "../shell/editor.h"
+#include "../drivers/keyboard.h"
 
 #define COMMAND_BUFFER_SIZE 256
 char command_buffer[COMMAND_BUFFER_SIZE];
 int command_len = 0;
 
 void parse_command(const char* cmd);
-
-const char keyboard_map[] = {
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
-  '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',
-    0,  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',   0,
-  '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',   0,   0,   0, ' '
-};
 
 extern "C" __attribute__((cdecl)) void keyboard_handler() {
     uint8_t scancode = inb(0x60);
@@ -168,6 +163,13 @@ void parse_command(const char* cmd) {
             
             neofs_write(filename, text_payload);
         }
+    }
+    else if (kstrncmp(cmd, "edit ", 5) == 0) {
+        const char* target_file = cmd + 5;
+        
+        neofs_touch(target_file); 
+        
+        run_text_editor(target_file);
     }
     else if (kstrncmp(cmd, "cat ", 4) == 0) {
         const char* filename = cmd + 4;

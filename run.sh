@@ -13,12 +13,14 @@ i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/idt.cpp" -o "Binaries/idt.
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/shell.cpp" -o "Binaries/shell.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/kernel/paging.cpp" -o "Binaries/paging.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/terminal.cpp" -o "Binaries/terminal.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/keyboard.cpp" -o "Binaries/keyboard.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/io.cpp" -o "Binaries/io.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/pic.cpp" -o "Binaries/pic.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/drivers/ata.cpp" -o "Binaries/ata.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/memory/memory.cpp" -o "Binaries/memory.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/fs/neofs.cpp" -o "Binaries/neofs.o"
 i386-elf-gcc -ffreestanding -m32 -g -c "kernel/shell/string.cpp" -o "Binaries/string.o"
+i386-elf-gcc -ffreestanding -m32 -g -c "kernel/shell/editor.cpp" -o "Binaries/editor.o"
 
 i386-elf-ld -T linker.ld -o "Binaries/full_kernel.bin" \
     "Binaries/kernel_entry.o" \
@@ -33,6 +35,8 @@ i386-elf-ld -T linker.ld -o "Binaries/full_kernel.bin" \
     "Binaries/memory.o" \
     "Binaries/neofs.o" \
     "Binaries/string.o" \
+    "Binaries/editor.o" \
+    "Binaries/keyboard.o" \
     --oformat binary
 
 cat "Binaries/boot.bin" "Binaries/full_kernel.bin" > "Binaries/OS.bin"
