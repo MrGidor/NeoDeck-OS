@@ -20,6 +20,7 @@ void terminal_clear();
 void terminal_scroll();
 void terminal_put_char(char c);
 void kprint(const char* str);
+void kprint_log(const char* str, bool success = true);
 void kprint_color(const char* str, uint8_t color);
 void kprint_success(const char* str);
 void kprint_warning(const char* str);

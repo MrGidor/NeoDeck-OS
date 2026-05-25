@@ -26,21 +26,21 @@ extern "C" void main() {
     neofs_init();
 
     kprint("Booting NeoDeck...\n");
-    kprint_info("Memory allocation bitmap safely initialized.\n");
+    kprint_log("Memory allocation bitmap safely initialized.\n");
 
     idt_init();
     pic_remap(); 
-    kprint_info("PIC and hardware registers configured successfully.\n");
+    kprint_log("PIC and hardware registers configured successfully.\n");
 
-    kprint_info("Initializing 4MB identity paging map...\n");
+    kprint_log("Initializing 4MB identity paging map...\n");
     paging_init();
 
-    kprint_info("Enabling CPU Memory Management Unit (MMU)...\n");
+    kprint_log("Enabling CPU Memory Management Unit (MMU)...\n");
     enable_paging(PAGE_DIRECTORY_ADDRESS);
-    kprint_info("Virtual memory architecture operational!\n");
+    kprint_log("Virtual memory architecture operational!\n");
 
     asm volatile("sti");
-    kprint_info("System ready. Type 'help' for a list of supported commands.\n");
+    kprint("System ready. Type 'help' for a list of supported commands.\n");
     kprint("\n/> ");
 
     while(1) { 

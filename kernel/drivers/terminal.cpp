@@ -80,6 +80,16 @@ void kprint_color(const char* str, uint8_t color) {
     terminal_color = old_color;
 }
 
+void kprint_log(const char* str, bool success) {
+    if (success) {
+        kprint("[ "); kprint_success(" OK "); kprint(" ] "); kprint(str); return;
+    } else {
+        kprint("[ "); kprint_error(" ERROR "); kprint(" ] "); kprint(str); return;
+    }
+    kprint(str);
+
+}
+
 void kprint_success(const char* str) { kprint_color(str, COLOR_SUCCESS); }
 void kprint_warning(const char* str) { kprint_color(str, COLOR_WARNING); }
 void kprint_error(const char* str)   { kprint_color(str, COLOR_ERROR);   }
