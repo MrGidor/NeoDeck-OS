@@ -35,6 +35,8 @@ void neofs_mkdir(const char* dir_name);
 void neofs_touch(const char* filename);
 void neofs_write(const char* filename, const char* text);
 void neofs_cat(const char* filename);
+void neofs_rm(const char* filename);
+uint32_t neofs_read_to_buffer(const char* filename, char* out_buffer, uint32_t max_size);
 
 extern int current_directory_inode;
 
