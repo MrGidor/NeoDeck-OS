@@ -26,5 +26,7 @@ void idt_init() {
     idt_set_gate(0, (uint32_t)isr0, 0x08, 0x8E);
     idt_set_gate(0x21, (uint32_t)isr21, 0x08, 0x8E);
 
+    idt_set_gate(0x80, (uint32_t)isr80, 0x08, 0xEE);
+
     load_idt((uint32_t)&idt_reg);
 }

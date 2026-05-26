@@ -51,3 +51,14 @@ enable_paging:
     or eax, 0x80000000    ; Set the Paging Enable (PG) bit 31 to 1
     mov cr0, eax          ; flip mmu
     ret
+
+global isr80
+[extern syscall_handler]
+
+isr80:
+    pusha               ; 1. Save all application registers safely
+
+    call syscall_handler ; 2. Jump straight into our clean C++ tracker
+
+    popa                ; 3. Restore all application registers safely
+    iret                ; 4. Return to hello.bin

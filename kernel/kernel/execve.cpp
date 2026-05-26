@@ -13,6 +13,8 @@ typedef unsigned int   uint32_t;
 
 typedef void (*entry_point_t)();
 
+extern "C" uint32_t current_app_base_address;
+
 void sys_exec(const char* filename) {
     alignas(4) uint8_t sector_buffer[512];
     ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
@@ -54,10 +56,10 @@ void sys_exec(const char* filename) {
 
     kprint_info("Loaded executable into memory address space. Jumping execution...\n");
 
-    // Cast the memory address to a parameterless function pointer and invoke it.
+    current_app_base_address = (uint32_t)program_space;
+
     entry_point_t start_program = (entry_point_t)program_space;
     
-    // The CPU jumps to app code, runs it, and returns here when finished!
     start_program(); 
 
     kprint_success("Process finished execution. Regaining kernel control.\n");

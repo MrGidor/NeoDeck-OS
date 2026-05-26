@@ -24,6 +24,7 @@ extern idt_ptr_struct   idt_reg;
 extern "C" void load_idt(uint32_t idt_ptr_address);
 extern "C" void isr0(); 
 extern "C" void isr21(); 
+extern "C" void isr80();
 extern "C" void default_stub_handler();
 
 void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags);
