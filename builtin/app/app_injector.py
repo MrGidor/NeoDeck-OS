@@ -47,13 +47,41 @@ def inject_file(host_filename, os_filename):
             print("Error: Root directory entry slots full!")
             return
 
-        # Assign hardcoded start sector for simplicity (matching your touch logic)
-        start_sector = 20 + free_inode
+        # Places files sequentially based on their inode number to avoid overwrites
+        # We give each file 800 sectors max room.
+        start_sector = 20 + (free_inode * 800) 
+        
+        # Chop payload into 508-byte data chunks
+        chunk_size = 508
+        payload_chunks = [payload[i:i + chunk_size] for i in range(0, len(payload), chunk_size)]
+        total_chunks = len(payload_chunks)
 
+        print(f"Slicing binary payload into {total_chunks} linked disk clusters...")
+
+        for idx, chunk in enumerate(payload_chunks):
+            current_sector = start_sector + idx
+            
+            # Pad data portion out to exactly 508 bytes
+            padded_chunk = bytearray(chunk + b'\x00' * (chunk_size - len(chunk)))
+            
+            # Calculate next sector link configuration descriptor
+            if idx == total_chunks - 1:
+                # Last cluster block gets the EOF marker (0xFFFFFFFF)
+                next_sector = 0xFFFFFFFF
+            else:
+                next_sector = current_sector + 1
+
+            padded_chunk += bytearray(next_sector.to_bytes(4, 'little'))
+            
+            disk.seek(current_sector * 512)
+            disk.write(padded_chunk)
+
+        # -----------------------------------------------------------------
+        # Structural Inode Metadata Registration Block Updates
+        # -----------------------------------------------------------------
         inode_offset = free_inode * 10
         inode_bytes[inode_offset + 0] = 1 # TYPE_FILE
         
-        # Clean sequential indices fixing the inline syntax bug
         size_start = inode_offset + 1
         size_end = inode_offset + 5
         inode_bytes[size_start:size_end] = payload_len.to_bytes(4, 'little')
@@ -79,12 +107,7 @@ def inject_file(host_filename, os_filename):
         disk.seek(ROOT_DIR_SECTOR * 512)
         disk.write(dir_bytes)
 
-        disk.seek(start_sector * 512)
-        # Pad payload to match full 512-byte block structures if it's a short test file
-        padded_payload = payload + b'\x00' * (512 - (payload_len % 512))
-        disk.write(padded_payload)
-
         print(f"Successfully injected '{host_filename}' into NeoFS as '{os_filename}' ({payload_len} bytes)!")
 
 if __name__ == "__main__":
-    inject_file("hello.bin", "hello.bin")
+    inject_file("shell.bin", "shell.bin")
