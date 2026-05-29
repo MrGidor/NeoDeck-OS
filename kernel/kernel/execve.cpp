@@ -44,17 +44,20 @@ void sys_exec(const char* filename) {
         return;
     }
 
-    uint32_t blocks_needed = (bin_size / 16) + 1;
+    uint32_t blocks_needed = (bin_size + (BLOCK_SIZE - 1)) / BLOCK_SIZE;
+
     uint8_t* program_space = (uint8_t*)kmalloc(blocks_needed);
 
     if (program_space == NULL) {
         kprint_error("Exec Error: Failed to allocate process memory.\n");
         return;
     }
+    
+    // Grab the start sector directly from the inode we already found right here!
+    uint32_t start_sector = inodes[target_inode].start_sector;
 
-    neofs_read_to_buffer(filename, (char*)program_space, bin_size + 1);
-
-    kprint_info("Loaded executable into memory address space. Jumping execution...\n");
+    // Call our lightweight data stream reader
+    neofs_read_raw_data(start_sector, bin_size, (char*)program_space);
 
     current_app_base_address = (uint32_t)program_space;
 

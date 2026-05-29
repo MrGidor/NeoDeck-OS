@@ -56,9 +56,11 @@ global isr80
 [extern syscall_handler]
 
 isr80:
-    pusha               ; 1. Save all application registers safely
+    pusha                ; 1. Save all application registers safely (EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX)
 
-    call syscall_handler ; 2. Jump straight into our clean C++ tracker
+    push esp             
+    call syscall_handler 
+    add esp, 4           ; 4. Clean up the passed argument off the stack loop
 
-    popa                ; 3. Restore all application registers safely
-    iret                ; 4. Return to hello.bin
+    popa                 ; 5. Restore registers (EAX will now hold the updated value!)
+    iret                

@@ -509,3 +509,69 @@ uint32_t neofs_find_free_sector() {
     }
     return 0; 
 }
+
+// A streamlined version that takes a known start sector and size directly
+uint32_t neofs_read_raw_data(uint32_t start_sector, uint32_t file_size, char* out_buffer) {
+    uint32_t current_sector = start_sector;
+    uint32_t total_bytes_left = file_size;
+    uint32_t bytes_read = 0;
+    
+    alignas(4) uint8_t data_block[512];
+    
+    while (current_sector != 0xFFFFFFFF && total_bytes_left > 0) {
+
+        ata_read_sector(current_sector, data_block);
+        
+        uint32_t chunk = (total_bytes_left > 508) ? 508 : total_bytes_left;
+
+        for (uint32_t i = 0; i < chunk; i++) {
+            out_buffer[bytes_read++] = (char)data_block[i];
+        }
+
+        total_bytes_left -= chunk;
+
+        uint32_t* next_sector_ptr = (uint32_t*)&data_block[508];
+        current_sector = *next_sector_ptr;
+
+    }
+
+    out_buffer[bytes_read] = '\0'; 
+    return bytes_read; 
+}
+
+// Returns the size of a file in bytes, or 0 if it doesn't exist
+uint32_t neofs_get_file_size(const char* filename) {
+    alignas(4) uint8_t sector_buffer[512];
+    alignas(4) uint8_t dir_buffer[512];
+
+    ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
+    neofs_inode* inodes = (neofs_inode*)sector_buffer;
+
+    uint32_t current_dir_sector = inodes[current_directory_inode].start_sector;
+    ata_read_sector(current_dir_sector, dir_buffer);
+    neofs_dir_entry* entries = (neofs_dir_entry*)dir_buffer;
+
+    for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
+        if (entries[i].used == 1 && kstrcmp(entries[i].name, filename) == 0) {
+            uint32_t target_inode = entries[i].inode_num;
+            if (inodes[target_inode].type == TYPE_FILE) {
+                return inodes[target_inode].size;
+            }
+        }
+    }
+    return 0; // File not found or is a directory
+}
+
+// Safely dumps raw directory entries directly into a user-provided buffer
+void neofs_get_dir_entries(void* dest_buffer) {
+    alignas(4) uint8_t sector_buffer[512];
+    alignas(4) uint8_t dir_buffer[512];
+
+    ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
+    neofs_inode* inodes = (neofs_inode*)sector_buffer;
+
+    uint32_t current_dir_sector = inodes[current_directory_inode].start_sector;
+    
+    // Read the active entries right from the drive and drop them into the target buffer space
+    ata_read_sector(current_dir_sector, (uint8_t*)dest_buffer);
+}

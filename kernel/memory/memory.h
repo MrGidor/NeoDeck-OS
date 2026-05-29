@@ -1,9 +1,9 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#define KERNEL_HEAP_START 0x100000
-#define KERNEL_HEAP_SIZE  0x100000
-#define BLOCK_SIZE 16
+#define KERNEL_HEAP_START 0x1000000
+#define KERNEL_HEAP_SIZE  0x2000000
+#define BLOCK_SIZE 512
 #define BITMAP_SIZE (KERNEL_HEAP_SIZE / BLOCK_SIZE)
 
 void* kmalloc(int n_blocks);

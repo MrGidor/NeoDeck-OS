@@ -26,8 +26,12 @@ struct neofs_dir_entry {
     uint8_t  used;
 } __attribute__((packed));
 
+void kprint_hex(uint32_t val);
 void neofs_init();
+uint32_t neofs_get_file_size(const char* filename);
+void neofs_get_dir_entries(void* dest_buffer);
 uint32_t neofs_find_free_sector();
+uint32_t neofs_read_raw_data(uint32_t start_sector, uint32_t file_size, char* out_buffer);
 void neofs_format();
 void neofs_ls();
 void neofs_cd(const char* target_name);
