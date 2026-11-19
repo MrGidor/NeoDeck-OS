@@ -35,3 +35,31 @@ void kstrncpy(char* dest, const char* src, int n) {
         if (src[i] == '\0') break;
     }
 }
+
+int ktokenize(char* line, char** argv, int max_args) {
+    int argc = 0;
+    char* p = line;
+
+    while (*p && argc < max_args) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (!*p) break;
+
+        if (*p == '"') {
+            p++;
+            argv[argc++] = p;
+            while (*p && *p != '"') p++;
+        } else {
+            argv[argc++] = p;
+            while (*p && *p != ' ' && *p != '\t') p++;
+        }
+        if (*p) *p++ = '\0';
+    }
+    argv[argc] = 0;
+    return argc;
+}
+
+unsigned int katou(const char* s) {
+    unsigned int v = 0;
+    while (*s >= '0' && *s <= '9') v = v * 10 + (*s++ - '0');
+    return v;
+}

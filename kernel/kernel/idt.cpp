@@ -1,7 +1,3 @@
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-
 #include "idt.h"
 
 idt_entry_struct idt[256];
@@ -23,8 +19,12 @@ void idt_init() {
         idt_set_gate(i, (uint32_t)default_stub_handler, 0x08, 0x8E);
     }
 
-    idt_set_gate(0, (uint32_t)isr0, 0x08, 0x8E);
-    idt_set_gate(0x21, (uint32_t)isr21, 0x08, 0x8E);
+    for (int i = 0; i < 32; i++) {
+        idt_set_gate(i, isr_stub_table[i], 0x08, 0x8E);
+    }
+    for (int i = 0; i < 16; i++) {
+        idt_set_gate(IRQ_VECTOR_BASE + i, irq_stub_table[i], 0x08, 0x8E);
+    }
 
     idt_set_gate(0x80, (uint32_t)isr80, 0x08, 0xEE);
 

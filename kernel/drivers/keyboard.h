@@ -1,13 +1,15 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-const char keyboard_map[] = {
-    0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
-  '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',
-    0,  'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`',   0,
-  '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',   0,   0,   0, ' '
-};
+#include "../include/types.h"
 
-char keyboard_get_key();
+#define KEYBOARD_BUFFER_SIZE 256   /* must be a power of two */
+
+void keyboard_init();               /* hook IRQ1 and unmask it */
+
+/* Ring buffer filled by the IRQ1 handler, drained by the main loop / syscalls. */
+bool keyboard_has_chars();
+char keyboard_pop_char();           /* non-blocking, returns 0 if empty */
+char keyboard_get_char();           /* blocks (hlt) until a char is available */
 
 #endif

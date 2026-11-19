@@ -35,3 +35,11 @@ void *kmalloc(int n_blocks) {
     }
     return (void*)0;
 }
+
+void kfree(void* ptr, int n_blocks) {
+    if (ptr == (void*)0 || n_blocks <= 0) return;
+    int start = ((int)ptr - (int)dynamic_mem_loc) / BLOCK_SIZE;
+    if (start < 0 || start + n_blocks > allocation_bitmap_size) return;
+    for (int i = start; i < start + n_blocks; i++)
+        allocation_bitmap[i / 8] &= ~(1 << (i % 8));
+}

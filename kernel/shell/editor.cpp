@@ -1,6 +1,4 @@
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
+#include "../include/types.h"
 
 // A temporary buffer in kernel heap/BSS to hold our active file text
 #define EDITOR_BUF_SIZE 4096
@@ -36,9 +34,7 @@ void run_text_editor(const char* filename) {
     int editing = 1;
     while (editing) {
 
-        char c = keyboard_get_key(); 
-
-        if (c == 0) continue; 
+        char c = keyboard_get_char();   // blocks in hlt, no polling
 
         if (c == 27) { 
             editing = 0;

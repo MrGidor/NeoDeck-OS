@@ -4,6 +4,8 @@ typedef unsigned int   uint32_t;
 
 #define NULL 0
 
+// WILL BE DEPRECATED AND REPLACED WITH FAT32 LATER ON THIS IS JUST A TEST FS
+
 #include "neofs.h"
 #include "../drivers/ata.h"
 #include "../drivers/terminal.h"

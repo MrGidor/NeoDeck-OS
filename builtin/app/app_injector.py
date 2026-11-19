@@ -5,6 +5,9 @@ DISK_IMG = "../../Binaries/hdd.img"
 INODE_TABLE_SECTOR = 2
 ROOT_DIR_SECTOR = 3
 
+
+# DEPRECATED WHEN FAT32 REPLACES TEST FS
+
 def inject_file(host_filename, os_filename):
     if not os.path.exists(host_filename):
         print(f"Error: Host file '{host_filename}' not found.")
@@ -110,4 +113,4 @@ def inject_file(host_filename, os_filename):
         print(f"Successfully injected '{host_filename}' into NeoFS as '{os_filename}' ({payload_len} bytes)!")
 
 if __name__ == "__main__":
-    inject_file("shell.bin", "shell.bin")
+    inject_file("hello.bin", "hello.bin")

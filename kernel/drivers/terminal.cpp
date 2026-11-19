@@ -94,3 +94,14 @@ void kprint_success(const char* str) { kprint_color(str, COLOR_SUCCESS); }
 void kprint_warning(const char* str) { kprint_color(str, COLOR_WARNING); }
 void kprint_error(const char* str)   { kprint_color(str, COLOR_ERROR);   }
 void kprint_info(const char* str)    { kprint_color(str, COLOR_INFO);    }
+
+void kprint_dec(uint32_t value) {
+    char buf[11];
+    int i = 10;
+    buf[i] = '\0';
+    do {
+        buf[--i] = '0' + (value % 10);
+        value /= 10;
+    } while (value > 0);
+    kprint(&buf[i]);
+}

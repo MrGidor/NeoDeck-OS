@@ -1,7 +1,5 @@
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-
+#include "../include/types.h"
+#include "shell.h"
 #include "idt.h"
 #include "../drivers/terminal.h"
 #include "../drivers/io.h"
@@ -13,6 +11,7 @@ typedef unsigned int   uint32_t;
 #include "../shell/editor.h"
 #include "../drivers/keyboard.h"
 #include "execve.h"
+#include "../drivers/timer.h"
 
 #define COMMAND_BUFFER_SIZE 256
 char command_buffer[COMMAND_BUFFER_SIZE];
@@ -20,50 +19,40 @@ int command_len = 0;
 
 void parse_command(const char* cmd);
 
-extern "C" __attribute__((cdecl)) void keyboard_handler() {
-    uint8_t scancode = inb(0x60);
+/* Called from the main loop for every character the keyboard IRQ buffered.
+ * Runs in normal context with interrupts enabled, never inside an IRQ. */
+void shell_handle_char(char c) {
+    if (c == '\n') {
+        command_buffer[command_len] = '\0';
+        terminal_put_char('\n');
 
-    if (scancode < sizeof(keyboard_map)) {
-        if (!(scancode & 0x80)) { 
-            char c = keyboard_map[scancode];
-            
-            if (c == '\n') {
-                command_buffer[command_len] = '\0';
-                
-                terminal_put_char('\n'); 
-                
-                if (command_len > 0) {
-                    parse_command(command_buffer); 
-                } else {
-                    kprint("> ");
-                }
-                
-                command_len = 0;
-
-            } else if (c == '\b') {
-                if (command_len > 0) {
-                    command_len--;
-                    
-                    if (terminal_column > 0) {
-                        terminal_column--;
-                    } else if (terminal_row > 0) {
-                        terminal_row--;
-                        terminal_column = VGA_COLS - 1;
-                    }
-                    
-                    int index = (terminal_row * VGA_COLS + terminal_column) * 2;
-                    video_memory[index] = ' ';
-                    video_memory[index + 1] = DEFAULT_COLOR;
-                    update_hardware_cursor();
-                }
-            } else if (c != 0 && command_len < COMMAND_BUFFER_SIZE - 1) {
-                command_buffer[command_len++] = c;
-                terminal_put_char(c);
-            }
+        if (command_len > 0) {
+            parse_command(command_buffer);
+        } else {
+            kprint("> ");
         }
-    }
+        command_len = 0;
 
-    pic_send_eoi(1);
+    } else if (c == '\b') {
+        if (command_len > 0) {
+            command_len--;
+
+            if (terminal_column > 0) {
+                terminal_column--;
+            } else if (terminal_row > 0) {
+                terminal_row--;
+                terminal_column = VGA_COLS - 1;
+            }
+
+            int index = (terminal_row * VGA_COLS + terminal_column) * 2;
+            video_memory[index] = ' ';
+            video_memory[index + 1] = DEFAULT_COLOR;
+            update_hardware_cursor();
+        }
+    } else if (c >= ' ' && c < 127 && command_len < COMMAND_BUFFER_SIZE - 1) {
+        command_buffer[command_len++] = c;
+        terminal_put_char(c);
+    }
 }
 
 void neodeck_meminfo() {
@@ -85,24 +74,10 @@ void neodeck_meminfo() {
     kprint_info("NeoDeck Heap Memory Diagnostics:\n");
     kprint_info("  Total Heap Space: ");
     
-    auto kprint_int = [](uint32_t num) {
-        if (num == 0) { kprint("0"); return; }
-        char buf[32];
-        int idx = 0;
-        while (num > 0) {
-            buf[idx++] = (num % 10) + '0';
-            num /= 10;
-        }
-        for (int j = idx - 1; j >= 0; j--) {
-            char c[2] = { buf[j], '\0' };
-            kprint(c);
-        }
-    };
-
-    kprint_int(total_heap_bytes / 1024); kprint_info(" KB\n  Used Heap Space:  ");
-    kprint_int(used_heap_bytes);         kprint_info(" Bytes (");
-    kprint_int(used_blocks);             kprint_info(" blocks)\n  Free Heap Space:  ");
-    kprint_int(free_heap_bytes / 1024);  kprint_info(" KB\n");
+    kprint_dec(total_heap_bytes / 1024); kprint_info(" KB\n  Used Heap Space:  ");
+    kprint_dec(used_heap_bytes);         kprint_info(" Bytes (");
+    kprint_dec(used_blocks);             kprint_info(" blocks)\n  Free Heap Space:  ");
+    kprint_dec(free_heap_bytes / 1024);  kprint_info(" KB\n");
 }
 
 void parse_command(const char* cmd) {
@@ -118,6 +93,10 @@ void parse_command(const char* cmd) {
         kprint("  write <file> <text> - Write text content into a file\n");
         kprint("  cat <file> - Display the text content of a file\n");
         kprint("  meminfo   - Display kernel heap memory usage stats\n");
+        kprint("  uptime    - Time since boot\n");
+        kprint("  sleep <ms> - Sleep for N milliseconds\n");
+        kprint("  exec <file> [args] - Run an app binary with arguments\n");
+        kprint("  edit <file> - Open the text editor\n");
     } 
     else if (kstrcmp(cmd, "clear") == 0) {
         terminal_clear();
@@ -146,8 +125,33 @@ void parse_command(const char* cmd) {
         if (*filename == '\0') kprint("Usage: touch <filename>\n");
         else neofs_touch(filename);
     }
+    else if (kstrcmp(cmd, "uptime") == 0) {
+        uint32_t ms = timer_uptime_ms();
+        kprint("Uptime: "); kprint_dec(ms / 1000); kprint("."); 
+        uint32_t frac = ms % 1000;
+        if (frac < 100) kprint("0");
+        if (frac < 10) kprint("0");
+        kprint_dec(frac); kprint(" s (");
+        kprint_dec(timer_ticks()); kprint(" ticks)\n");
+    }
+    else if (kstrncmp(cmd, "sleep ", 6) == 0) {
+        timer_sleep_ms(katou(cmd + 6));
+    }
     else if (kstrncmp(cmd, "meminfo", 7) == 0) {
         neodeck_meminfo();
+    }
+    else if (kstrncmp(cmd, "panic", 5) == 0) { // COMMAND TO TEST KERNEL PANIC
+        int which = (cmd[5] == ' ') ? (int)katou(cmd + 6) : 0;
+        if (which == 0) {            // #DE divide error
+            volatile int zero = 0;
+            asm volatile("div %0" : : "r"(zero), "a"(1), "d"(0));
+        } else if (which == 1) {     // #UD invalid opcode
+            asm volatile("ud2");
+        } else if (which == 2) {     // #PF page fault (address above the 48 MB identity map)
+            *(volatile int*)0x40000000 = 1;
+        } else if (which == 3) {     // #GP general protection (bad segment selector)
+            asm volatile("mov $0x1234, %%ax; mov %%ax, %%ds" : : : "ax");
+        }
     }
     else if (kstrncmp(cmd, "write ", 6) == 0) {
         const char* params = cmd + 6; 
@@ -211,16 +215,4 @@ void parse_command(const char* cmd) {
 
     }
     kprint("> ");
-}
-
-extern "C" void isr0_handler() {
-    kprint_error("\n========================================\n");
-    kprint_error(" CRITICAL KERNEL EXCEPTION: DIVIDE BY 0 \n");
-    kprint_error(" System Execution Halted to Protect Data.\n");
-    kprint_error("========================================\n");
-    asm volatile("cli; hlt");
-}
-
-extern "C" __attribute__((cdecl)) void fallback_handler() {
-    pic_send_eoi(7);
 }

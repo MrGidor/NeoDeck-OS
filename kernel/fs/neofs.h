@@ -1,28 +1,23 @@
 #ifndef NEOFS_H
 #define NEOFS_H
 
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
+#include "../include/types.h"
+#include "neodeck_abi.h"   /* on-disk constants + neofs_dir_entry, shared with the SDK */
 
-#define INODE_TABLE_SECTOR 2
-#define ROOT_DIR_SECTOR    3
-#define MAX_INODES 16
-#define MAX_DIR_ENTRIES 16
-#define MAX_FILENAME 14
-#define TYPE_FILE 1
-#define TYPE_DIR  2
+// WILL BE DEPRECATED AND REPLACED WITH FAT32 LATER ON THIS IS JUST A TEST FS
+
+#define INODE_TABLE_SECTOR NEOFS_INODE_TABLE_SECTOR
+#define ROOT_DIR_SECTOR    NEOFS_ROOT_DIR_SECTOR
+#define MAX_INODES         NEOFS_MAX_INODES
+#define MAX_DIR_ENTRIES    NEOFS_MAX_DIR_ENTRIES
+#define MAX_FILENAME       NEOFS_MAX_FILENAME
+#define TYPE_FILE          NEOFS_TYPE_FILE
+#define TYPE_DIR           NEOFS_TYPE_DIR
 
 struct neofs_inode {
     uint8_t  type;
     uint32_t size;
     uint32_t start_sector;
-    uint8_t  used;
-} __attribute__((packed));
-
-struct neofs_dir_entry {
-    uint32_t inode_num;
-    char     name[MAX_FILENAME];
     uint8_t  used;
 } __attribute__((packed));
 

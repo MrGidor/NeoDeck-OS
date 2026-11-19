@@ -1,38 +1,38 @@
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-
-#define NULL 0
-#define PAGE_DIRECTORY_ADDRESS  0xE00000
-#define PAGE_TABLE_0_ADDRESS    0xE01000
+#include "../include/types.h"
+#include "../include/layout.h"
 
 #include "idt.h"
+#include "shell.h"
 #include "../drivers/terminal.h"
 #include "../drivers/io.h"
 #include "../drivers/pic.h"
 #include "../drivers/ata.h"
+#include "../drivers/keyboard.h"
+#include "../drivers/timer.h"
 #include "../memory/memory.h"
 #include "../fs/neofs.h"
 
 extern void paging_init();
 extern "C" void enable_paging(uint32_t page_directory_address);
 
+/* .bss (including the heap bitmap) is zeroed by kernel_entry.asm before main. */
 extern "C" void main() {
     terminal_clear();
-
-    for (int i = 0; i < BITMAP_SIZE / 8; i++)
-        allocation_bitmap[i] = 0;
 
     neofs_init();
 
     kprint("Booting NeoDeck...\n");
-    kprint_log("Memory allocation bitmap safely initialized.\n");
+    kprint_log("Kernel .bss cleared, stack ready.\n");
 
     idt_init();
-    pic_remap(); 
-    kprint_log("PIC and hardware registers configured successfully.\n");
+    kprint_log("IDT loaded (CPU exceptions 0-31 -> panic screen).\n");
 
-    kprint_log("Initializing 4MB identity paging map...\n");
+    pic_remap();
+    timer_init();
+    keyboard_init();
+    kprint_log("PIC remapped; PIT timer (IRQ0) and keyboard (IRQ1) online.\n");
+
+    kprint_log("Initializing identity paging map...\n");
     paging_init();
 
     kprint_log("Enabling CPU Memory Management Unit (MMU)...\n");
@@ -43,7 +43,8 @@ extern "C" void main() {
     kprint("System ready. Type 'help' for a list of supported commands.\n");
     kprint("\n/> ");
 
-    while(1) { 
-        asm volatile("hlt");
+    /* The IRQ only fills the keyboard ring buffer; the shell runs here. */
+    while (1) {
+        shell_handle_char(keyboard_get_char());
     }
 }

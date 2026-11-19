@@ -1,33 +1,31 @@
-typedef unsigned int uint32_t;
+#include "neodeck.h"
 
-void sys_print(const char* text) {
-    // "a" explicitly binds the value 1 to the EAX register
-    // "b" explicitly binds the pointer 'text' to the EBX register
-    asm volatile(
-        "int $0x80"
-        :
-        : "a"(1), "b"(text)
-        : "memory"
-    );
+static void print_dec(uint32_t v) {
+    char buf[11]; int i = 10; buf[i] = 0;
+    do { buf[--i] = '0' + v % 10; v /= 10; } while (v);
+    sys_print(&buf[i]);
 }
 
-void sys_clear() {
-    // "a" explicitly binds the value 2 to the EAX register
-    asm volatile(
-        "int $0x80"
-        :
-        : "a"(2)
-        : "memory"
-    );
-}
+// Must be the first function in the binary (see app.ld) - the kernel calls offset 0.
+extern "C" __attribute__((section(".text.entry"))) int main(int argc, char** argv) {
+    sys_print("NeoDeck hello: ");
+    print_dec(argc);
+    sys_print(" argument(s)\n");
 
-void main() {
-    sys_clear();
-    sys_print("NeoDeck Engine: Hello via a real Syscall Interrupt!\n");
-    sys_print("This scales naturally inside your kernel print buffer.\n");
-    
-    // Lock the CPU here so it stays on screen when it works!
-    while(1) {
-        asm volatile("hlt");
+    for (int i = 0; i < argc; i++) {
+        sys_print("  argv[");
+        print_dec(i);
+        sys_print("] = ");
+        sys_print(argv[i]);
+        sys_print("\n");
     }
+
+    sys_print("Sleeping 1 second...\n");
+    uint32_t before = sys_uptime_ms();
+    sys_sleep(1000);
+    sys_print("Slept for ~");
+    print_dec(sys_uptime_ms() - before);
+    sys_print(" ms\n");
+
+    return argc;   // exit status; sys_exit(n) from anywhere works too
 }

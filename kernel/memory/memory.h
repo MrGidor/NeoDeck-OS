@@ -1,12 +1,12 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#define KERNEL_HEAP_START 0x1000000
-#define KERNEL_HEAP_SIZE  0x2000000
+#include "../include/layout.h"   /* KERNEL_HEAP_START / KERNEL_HEAP_SIZE */
 #define BLOCK_SIZE 512
 #define BITMAP_SIZE (KERNEL_HEAP_SIZE / BLOCK_SIZE)
 
 void* kmalloc(int n_blocks);
+void  kfree(void* ptr, int n_blocks);   /* n_blocks must match the kmalloc call */
 int get_bitmap(unsigned char* map, int index);
 void set_bitmap(unsigned char* map, int index);
 

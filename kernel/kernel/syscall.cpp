@@ -1,10 +1,10 @@
-typedef unsigned char  uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int   uint32_t;
-
-#include "../drivers/terminal.h" 
+#include "../include/types.h"
+#include "neodeck_abi.h"
+#include "../drivers/terminal.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/timer.h"
 #include "../fs/neofs.h"
+#include "execve.h"
 
 
 
@@ -22,23 +22,19 @@ extern "C" __attribute__((cdecl)) void syscall_handler(cpu_registers_t* regs) {
     uint32_t ecx_val = regs->ecx;
 
     switch(eax_val) {
-        case 1: { // sys_print
+        case NEODECK_SYS_PRINT: { // sys_print
             kprint((const char*)ebx_val);
             break;
         }
-        case 2: { // sys_clear
+        case NEODECK_SYS_CLEAR: { // sys_clear
             terminal_clear();
             break;
         }
-        case 3: { // sys_get_key
-            char c = 0;
-            while ((c = keyboard_get_key()) == 0) {
-                asm volatile("pause");
-            }
-            regs->eax = (uint32_t)(uint8_t)c;
+        case NEODECK_SYS_GET_KEY: { // blocks in hlt until the IRQ fills the buffer
+            regs->eax = (uint32_t)(uint8_t)keyboard_get_char();
             break;
         }
-        case 4: { // sys_read_file
+        case NEODECK_SYS_READ_FILE: { // sys_read_file
             const char* filename = (const char*)ebx_val;
             char* dest_buffer    = (char*)ecx_val;
 
@@ -48,36 +44,48 @@ extern "C" __attribute__((cdecl)) void syscall_handler(cpu_registers_t* regs) {
             }
             break;
         }
-        case 5: { // sys_get_dir_entries
+        case NEODECK_SYS_GET_DIR_ENTRIES: { // sys_get_dir_entries
             neofs_get_dir_entries((void*)ebx_val);
             break;
         }
-        case 6: { // sys_mkdir
+        case NEODECK_SYS_MKDIR: { // sys_mkdir
             neofs_mkdir((const char*)ebx_val);
             break;
         }
-        case 7: { // sys_cd
+        case NEODECK_SYS_CD: { // sys_cd
             neofs_cd((const char*)ebx_val);
             break;
         }
-        case 8: { // sys_touch
+        case NEODECK_SYS_TOUCH: { // sys_touch
             neofs_touch((const char*)ebx_val);
             break;
         }
-        case 9: { // sys_write_file
+        case NEODECK_SYS_WRITE_FILE: { // sys_write_file
             neofs_write((const char*)ebx_val, (const char*)ecx_val);
             break;
         }
-        case 10: { // sys_cat
+        case NEODECK_SYS_CAT: { // sys_cat
             neofs_cat((const char*)ebx_val);
             break;
         }
-        case 11: { // sys_get_active_dir_inode
+        case NEODECK_SYS_GET_ACTIVE_DIR: { // sys_get_active_dir_inode
             regs->eax = (uint32_t)current_directory_inode;
             break;
         }
-        case 12: { // sys_format
+        case NEODECK_SYS_FORMAT: { // sys_format
             neofs_format();
+            break;
+        }
+        case NEODECK_SYS_EXIT: {
+            exec_terminate((int)ebx_val);   // unwinds to sys_exec, never returns here
+            break;
+        }
+        case NEODECK_SYS_SLEEP: {
+            timer_sleep_ms(ebx_val);
+            break;
+        }
+        case NEODECK_SYS_UPTIME_MS: {
+            regs->eax = timer_uptime_ms();
             break;
         }
         default:

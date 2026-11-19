@@ -26,6 +26,7 @@ void kprint_success(const char* str);
 void kprint_warning(const char* str);
 void kprint_error(const char* str);
 void kprint_info(const char* str);
+void kprint_dec(uint32_t value);
 void update_hardware_cursor();
 
 #endif
