@@ -56,22 +56,26 @@ void sys_readline(char* buffer, int max_len) {
     buffer[index] = '\0'; // Null-terminate string
 }
 
-void sys_read_file(const char* filename, char* output_buffer) {
+uint32_t sys_read_file(const char* filename, char* output_buffer, uint32_t buffer_size) {
+    uint32_t n;
     asm volatile(
         "int $0x80"
-        :
-        : "a"(NEODECK_SYS_READ_FILE), "b"(filename), "c"(output_buffer)
+        : "=a"(n)
+        : "a"(NEODECK_SYS_READ_FILE), "b"(filename), "c"(output_buffer), "d"(buffer_size)
         : "memory"
     );
+    return n;
 }
 
-void sys_get_dir_entries(void* dest_buffer) {
+int sys_get_dir_entries(neodeck_dirent* dest, uint32_t max_entries) {
+    int n;
     asm volatile(
-        "int $0x80" 
-        : 
-        : "a"(NEODECK_SYS_GET_DIR_ENTRIES), "b"(dest_buffer) 
+        "int $0x80"
+        : "=a"(n)
+        : "a"(NEODECK_SYS_GET_DIR_ENTRIES), "b"(dest), "c"(max_entries)
         : "memory"
     );
+    return n;
 }
 
 void sys_mkdir(const char* name) { asm volatile("int $0x80" :: "a"(NEODECK_SYS_MKDIR), "b"(name) : "memory"); }
@@ -80,13 +84,31 @@ void sys_touch(const char* name) { asm volatile("int $0x80" :: "a"(NEODECK_SYS_T
 void sys_write_file(const char* name, const char* text) { asm volatile("int $0x80" :: "a"(NEODECK_SYS_WRITE_FILE), "b"(name), "c"(text) : "memory"); }
 void sys_cat(const char* name) { asm volatile("int $0x80" :: "a"(NEODECK_SYS_CAT), "b"(name) : "memory"); }
 
-uint32_t sys_get_active_dir_inode() {
-    uint32_t res;
-    asm volatile("int $0x80" : "=a"(res) : "a"(NEODECK_SYS_GET_ACTIVE_DIR) : "memory");
-    return res;
+uint32_t sys_get_cwd(char* buffer, uint32_t size) {
+    uint32_t len;
+    asm volatile("int $0x80" : "=a"(len) : "a"(NEODECK_SYS_GET_CWD), "b"(buffer), "c"(size) : "memory");
+    return len;
 }
 
 void sys_format() { asm volatile("int $0x80" :: "a"(NEODECK_SYS_FORMAT) : "memory"); }
+
+int sys_remove(const char* path) {
+    int r;
+    asm volatile("int $0x80" : "=a"(r) : "a"(NEODECK_SYS_REMOVE), "b"(path) : "memory");
+    return r;
+}
+
+int sys_rmdir(const char* path) {
+    int r;
+    asm volatile("int $0x80" : "=a"(r) : "a"(NEODECK_SYS_RMDIR), "b"(path) : "memory");
+    return r;
+}
+
+int sys_stat(const char* path, neodeck_stat* out) {
+    int r;
+    asm volatile("int $0x80" : "=a"(r) : "a"(NEODECK_SYS_STAT), "b"(path), "c"(out) : "memory");
+    return r;
+}
 
 void sys_exit(int status) {
     asm volatile("int $0x80" :: "a"(NEODECK_SYS_EXIT), "b"(status) : "memory");

@@ -3,7 +3,7 @@
 #include "../drivers/terminal.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/timer.h"
-#include "../fs/neofs.h"
+#include "../fs/fs.h"
 #include "execve.h"
 
 
@@ -20,6 +20,7 @@ extern "C" __attribute__((cdecl)) void syscall_handler(cpu_registers_t* regs) {
     uint32_t eax_val = regs->eax;
     uint32_t ebx_val = regs->ebx;
     uint32_t ecx_val = regs->ecx;
+    uint32_t edx_val = regs->edx;
 
     switch(eax_val) {
         case NEODECK_SYS_PRINT: { // sys_print
@@ -34,46 +35,59 @@ extern "C" __attribute__((cdecl)) void syscall_handler(cpu_registers_t* regs) {
             regs->eax = (uint32_t)(uint8_t)keyboard_get_char();
             break;
         }
-        case NEODECK_SYS_READ_FILE: { // sys_read_file
-            const char* filename = (const char*)ebx_val;
-            char* dest_buffer    = (char*)ecx_val;
-
-            uint32_t file_size = neofs_get_file_size(filename); 
-            if (file_size > 0) {
-                neofs_read_to_buffer(filename, dest_buffer, file_size + 1);
+        case NEODECK_SYS_READ_FILE: { // EBX=path, ECX=buffer, EDX=buffer size
+            regs->eax = fs_read_to_buffer((const char*)ebx_val, (char*)ecx_val, edx_val);
+            break;
+        }
+        case NEODECK_SYS_GET_DIR_ENTRIES: { // EBX=neodeck_dirent[], ECX=max entries
+            regs->eax = (uint32_t)fs_get_dir_entries((void*)ebx_val, ecx_val);
+            break;
+        }
+        case NEODECK_SYS_MKDIR: {
+            fs_mkdir((const char*)ebx_val);
+            break;
+        }
+        case NEODECK_SYS_CD: {
+            fs_cd((const char*)ebx_val);
+            break;
+        }
+        case NEODECK_SYS_TOUCH: {
+            fs_touch((const char*)ebx_val);
+            break;
+        }
+        case NEODECK_SYS_WRITE_FILE: {
+            fs_write((const char*)ebx_val, (const char*)ecx_val);
+            break;
+        }
+        case NEODECK_SYS_CAT: {
+            fs_cat((const char*)ebx_val);
+            break;
+        }
+        case NEODECK_SYS_GET_CWD: { // EBX=buffer, ECX=size
+            const char* cwd = fs_cwd();
+            char* dst = (char*)ebx_val;
+            uint32_t n = 0;
+            if (ecx_val > 0) {
+                while (cwd[n] && n + 1 < ecx_val) { dst[n] = cwd[n]; n++; }
+                dst[n] = '\0';
             }
+            regs->eax = n;
             break;
         }
-        case NEODECK_SYS_GET_DIR_ENTRIES: { // sys_get_dir_entries
-            neofs_get_dir_entries((void*)ebx_val);
+        case NEODECK_SYS_FORMAT: {
+            fs_format();
             break;
         }
-        case NEODECK_SYS_MKDIR: { // sys_mkdir
-            neofs_mkdir((const char*)ebx_val);
+        case NEODECK_SYS_REMOVE: {
+            regs->eax = (uint32_t)fs_remove_quiet((const char*)ebx_val);
             break;
         }
-        case NEODECK_SYS_CD: { // sys_cd
-            neofs_cd((const char*)ebx_val);
+        case NEODECK_SYS_RMDIR: {
+            regs->eax = (uint32_t)fs_rmdir_quiet((const char*)ebx_val);
             break;
         }
-        case NEODECK_SYS_TOUCH: { // sys_touch
-            neofs_touch((const char*)ebx_val);
-            break;
-        }
-        case NEODECK_SYS_WRITE_FILE: { // sys_write_file
-            neofs_write((const char*)ebx_val, (const char*)ecx_val);
-            break;
-        }
-        case NEODECK_SYS_CAT: { // sys_cat
-            neofs_cat((const char*)ebx_val);
-            break;
-        }
-        case NEODECK_SYS_GET_ACTIVE_DIR: { // sys_get_active_dir_inode
-            regs->eax = (uint32_t)current_directory_inode;
-            break;
-        }
-        case NEODECK_SYS_FORMAT: { // sys_format
-            neofs_format();
+        case NEODECK_SYS_STAT: {
+            regs->eax = (uint32_t)fs_stat((const char*)ebx_val, (void*)ecx_val);
             break;
         }
         case NEODECK_SYS_EXIT: {

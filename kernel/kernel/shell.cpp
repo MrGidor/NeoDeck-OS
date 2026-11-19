@@ -6,7 +6,7 @@
 #include "../drivers/pic.h"
 #include "../drivers/ata.h"
 #include "../shell/string.h"
-#include "../fs/neofs.h"
+#include "../fs/fs.h"
 #include "../memory/memory.h"
 #include "../shell/editor.h"
 #include "../drivers/keyboard.h"
@@ -85,11 +85,14 @@ void parse_command(const char* cmd) {
         kprint("NeoDeck OS Supported Commands:\n");
         kprint("  help      - Display this menu\n");
         kprint("  clear     - Flush the terminal screen\n");
-        kprint("  format    - Wipe hard disk and create NeoFS Root\n");
-        kprint("  ls        - List contents of current directory\n");
+        kprint("  format    - Wipe the hard disk and create a fresh FAT32 filesystem\n");
+        kprint("  ls [dir]  - List contents of the current (or given) directory\n");
         kprint("  mkdir <d> - Create a custom directory entry\n");
-        kprint("  cd <dir>  - Change active directory path (use '..' for root)\n");
+        kprint("  cd <dir>  - Change directory (supports '..', '/' and paths like /home/x)\n");
         kprint("  touch <file> - Create an empty file\n");
+        kprint("  rm <file> - Delete a file\n");
+        kprint("  rmdir <dir> - Delete an empty directory\n");
+        kprint("  df        - Show disk usage\n");
         kprint("  write <file> <text> - Write text content into a file\n");
         kprint("  cat <file> - Display the text content of a file\n");
         kprint("  meminfo   - Display kernel heap memory usage stats\n");
@@ -102,10 +105,13 @@ void parse_command(const char* cmd) {
         terminal_clear();
     } 
     else if (kstrcmp(cmd, "format") == 0) {
-        neofs_format();
+        fs_format();
     }
     else if (kstrcmp(cmd, "ls") == 0) {
-        neofs_ls();
+        fs_ls();
+    }
+    else if (kstrncmp(cmd, "ls ", 3) == 0) {
+        fs_ls(cmd + 3);
     }
     else if (kstrncmp(cmd, "exec ", 5) == 0) {
         sys_exec(cmd + 5);
@@ -113,17 +119,28 @@ void parse_command(const char* cmd) {
     else if (kstrncmp(cmd, "mkdir ", 6) == 0) {
         const char* dir_name = cmd + 6;
         if (*dir_name == '\0') kprint("Usage: mkdir <name>\n");
-        else neofs_mkdir(dir_name);
+        else fs_mkdir(dir_name);
     }
     else if (kstrncmp(cmd, "cd ", 3) == 0) {
         const char* target_dir = cmd + 3;
         if (*target_dir == '\0') kprint("Usage: cd <directory_name>\n");
-        else neofs_cd(target_dir);
+        else fs_cd(target_dir);
+    }
+    else if (kstrncmp(cmd, "rmdir ", 6) == 0) {
+        if (cmd[6] == '\0') kprint("Usage: rmdir <directory>\n");
+        else fs_rmdir(cmd + 6);
+    }
+    else if (kstrncmp(cmd, "rm ", 3) == 0) {
+        if (cmd[3] == '\0') kprint("Usage: rm <filename>\n");
+        else fs_rm(cmd + 3);
+    }
+    else if (kstrcmp(cmd, "df") == 0) {
+        fs_df();
     }
     else if (kstrncmp(cmd, "touch ", 6) == 0) {
         const char* filename = cmd + 6;
         if (*filename == '\0') kprint("Usage: touch <filename>\n");
-        else neofs_touch(filename);
+        else fs_touch(filename);
     }
     else if (kstrcmp(cmd, "uptime") == 0) {
         uint32_t ms = timer_uptime_ms();
@@ -160,29 +177,27 @@ void parse_command(const char* cmd) {
         if (space_idx == -1) {
             kprint("Usage: write <filename> <text_content>\n");
         } else {
-            char filename[MAX_FILENAME];
+            char filename[128];
             int i = 0;
-            for (; i < space_idx && i < (MAX_FILENAME - 1); i++) {
+            for (; i < space_idx && i < (int)sizeof(filename) - 1; i++) {
                 filename[i] = params[i];
             }
             filename[i] = '\0';
 
             const char* text_payload = params + space_idx + 1;
             
-            neofs_write(filename, text_payload);
+            fs_write(filename, text_payload);
         }
     }
     else if (kstrncmp(cmd, "edit ", 5) == 0) {
         const char* target_file = cmd + 5;
         
-        neofs_touch(target_file); 
-        
-        run_text_editor(target_file);
+        if (fs_prepare_file(target_file)) run_text_editor(target_file);
     }
     else if (kstrncmp(cmd, "cat ", 4) == 0) {
         const char* filename = cmd + 4;
         if (*filename == '\0') kprint("Usage: cat <filename>\n");
-        else neofs_cat(filename);
+        else fs_cat(filename);
     }
     else {
         kprint_error("NeoDeck Error: Command '");
@@ -191,28 +206,6 @@ void parse_command(const char* cmd) {
     }
 
     kprint("\n");
-    if (current_directory_inode == 0) {
-        kprint("/");
-    } else {
-        uint8_t root_dir_buffer[512];
-        ata_read_sector(ROOT_DIR_SECTOR, root_dir_buffer);
-        neofs_dir_entry* entries = (neofs_dir_entry*)root_dir_buffer;    
-
-        int name_found = 0;
-
-        for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-            if (entries[i].used == 1 && entries[i].inode_num == current_directory_inode) {
-                kprint("/");
-                kprint(entries[i].name);
-                name_found = 1;
-                break;
-            }
-        }
-        
-        if (!name_found) {
-            kprint("/sub-dir");
-        }
-
-    }
+    kprint(fs_cwd());
     kprint("> ");
 }

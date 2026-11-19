@@ -10,7 +10,7 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/timer.h"
 #include "../memory/memory.h"
-#include "../fs/neofs.h"
+#include "../fs/fs.h"
 
 extern void paging_init();
 extern "C" void enable_paging(uint32_t page_directory_address);
@@ -18,8 +18,6 @@ extern "C" void enable_paging(uint32_t page_directory_address);
 /* .bss (including the heap bitmap) is zeroed by kernel_entry.asm before main. */
 extern "C" void main() {
     terminal_clear();
-
-    neofs_init();
 
     kprint("Booting NeoDeck...\n");
     kprint_log("Kernel .bss cleared, stack ready.\n");
@@ -40,6 +38,8 @@ extern "C" void main() {
     kprint_log("Virtual memory architecture operational!\n");
 
     asm volatile("sti");
+
+    fs_init();   /* needs no interrupts, but keep boot messages in order */
     kprint("System ready. Type 'help' for a list of supported commands.\n");
     kprint("\n/> ");
 
