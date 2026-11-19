@@ -49,4 +49,4 @@ truncate -s 1440k "Binaries/OS.bin"
 
 dd if=/dev/zero of="Binaries/hdd.img" bs=1 count=0 seek=10M 2>/dev/null
 
-qemu-system-i386 -fda "Binaries/OS.bin" -drive format=raw,file="Binaries/hdd.img",bus=0,unit=0,media=disk -m 128M
+qemu-system-i386 -fda "Binaries/OS.bin" -drive format=raw,file="Binaries/hdd.img",bus=0,unit=0,media=disk -m 128M -display gtk

@@ -5,9 +5,35 @@ global isr0          ; Expose our Divide-by-Zero handler to C++
 global isr21         ; Expose keyboard ISR to C++
 
 _start:
+    ; The bootloader's GDT lives at 0x7C00+, which the kernel's .bss overlaps.
+    ; Switch to a GDT that is part of the kernel image before anything runs.
+    lgdt [kgdt_descriptor]
+    jmp 0x08:.reload_cs
+.reload_cs:
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    mov esp, 0x90000
+
     [extern main]
     call main
     jmp $
+
+align 8
+kgdt_start:
+    dd 0x0, 0x0                     ; null
+    dw 0xFFFF, 0x0000               ; code: base 0, limit 4G
+    db 0x00, 10011010b, 11001111b, 0x00
+    dw 0xFFFF, 0x0000               ; data: base 0, limit 4G
+    db 0x00, 10010010b, 11001111b, 0x00
+kgdt_end:
+
+kgdt_descriptor:
+    dw kgdt_end - kgdt_start - 1
+    dd kgdt_start
 
 ; Assembly function to physically hand the IDT pointer to the CPU
 load_idt:
@@ -63,4 +89,4 @@ isr80:
     add esp, 4           ; 4. Clean up the passed argument off the stack loop
 
     popa                 ; 5. Restore registers (EAX will now hold the updated value!)
-    iret                
+    iret
