@@ -31,10 +31,11 @@ extern "C" __attribute__((cdecl)) void syscall_handler(cpu_registers_t* regs) {
             break;
         }
         case 3: { // sys_get_key
-            while (!keyboard_has_chars()) {
-                asm volatile("hlt"); 
+            char c = 0;
+            while ((c = keyboard_get_key()) == 0) {
+                asm volatile("pause");
             }
-            regs->eax = (uint32_t)keyboard_pop_char(); 
+            regs->eax = (uint32_t)(uint8_t)c;
             break;
         }
         case 4: { // sys_read_file

@@ -3,8 +3,8 @@ typedef unsigned short uint16_t;
 typedef unsigned int   uint32_t;
 
 #define NULL 0
-#define PAGE_DIRECTORY_ADDRESS  0x9C000
-#define PAGE_TABLE_0_ADDRESS    0x9D000
+#define PAGE_DIRECTORY_ADDRESS  0xE00000
+#define PAGE_TABLE_0_ADDRESS    0xE01000
 
 #include "idt.h"
 #include "../drivers/terminal.h"

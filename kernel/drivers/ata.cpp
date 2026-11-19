@@ -35,7 +35,7 @@ void ata_write_sector(uint32_t target_sector, uint8_t* source_buffer) {
 
     uint16_t* buffer16 = (uint16_t*)source_buffer;
     for (int i = 0; i < 256; i++) {
-        asm volatile ("outw %0, %1" : : "a"(buffer16[i]), "Nd"(0x1F0));
+        asm volatile ("outw %0, %1" : : "a"(buffer16[i]), "Nd"((uint16_t)0x1F0));
     }
     
     outb(0x1F7, 0xE7); 
