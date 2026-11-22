@@ -38,6 +38,7 @@ void sys_readline(char* buffer, int max_len) {
     while (index < max_len - 1) {
         // This call will now freeze execution inside the KERNEL until a key is hit
         char c = sys_get_key(); 
+        if (c == 0) { sys_yield(); continue; }   // not the foreground task: nothing to read yet
         
         if (c == '\n') {
             sys_print("\n");
@@ -123,4 +124,32 @@ uint32_t sys_uptime_ms() {
     uint32_t ms;
     asm volatile("int $0x80" : "=a"(ms) : "a"(NEODECK_SYS_UPTIME_MS) : "memory");
     return ms;
+}
+
+void sys_yield() {
+    asm volatile("int $0x80" :: "a"(NEODECK_SYS_YIELD) : "memory");
+}
+
+uint32_t sys_getpid() {
+    uint32_t pid;
+    asm volatile("int $0x80" : "=a"(pid) : "a"(NEODECK_SYS_GETPID) : "memory");
+    return pid;
+}
+
+int sys_spawn(const char* cmdline, uint32_t flags) {
+    int pid;
+    asm volatile("int $0x80" : "=a"(pid) : "a"(NEODECK_SYS_SPAWN), "b"(cmdline), "c"(flags) : "memory");
+    return pid;
+}
+
+int sys_wait(int pid, int* status) {
+    int r;
+    asm volatile("int $0x80" : "=a"(r) : "a"(NEODECK_SYS_WAIT), "b"(pid), "c"(status) : "memory");
+    return r;
+}
+
+int sys_kill(int pid) {
+    int r;
+    asm volatile("int $0x80" : "=a"(r) : "a"(NEODECK_SYS_KILL), "b"(pid) : "memory");
+    return r;
 }

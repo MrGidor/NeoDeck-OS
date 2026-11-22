@@ -2,6 +2,7 @@
 #include "io.h"
 #include "pic.h"
 #include "../kernel/irq.h"
+#include "../kernel/task.h"
 
 #define PIT_CHANNEL0 0x40
 #define PIT_COMMAND  0x43
@@ -29,6 +30,10 @@ uint32_t timer_uptime_ms() { return ticks * TIMER_MS_PER_TICK; }
 void timer_sleep_ms(uint32_t ms) {
     /* +1 because we may start part-way through a tick */
     uint32_t wait = (ms + TIMER_MS_PER_TICK - 1) / TIMER_MS_PER_TICK + 1;
+    if (task_scheduler_active()) {
+        task_sleep_ticks(wait);              /* other tasks run meanwhile */
+        return;
+    }
     uint32_t start = ticks;
     while ((int32_t)(ticks - start) < (int32_t)wait) {
         asm volatile("sti; hlt");            /* sti shadow: no lost wake-up */

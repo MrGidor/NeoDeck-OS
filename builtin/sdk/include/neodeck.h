@@ -15,7 +15,7 @@ typedef unsigned int   uint32_t;
 // Syscall API Wrappers
 void sys_print(const char* text);
 void sys_clear();
-char sys_get_key();                 // blocks until a key is pressed
+char sys_get_key();                 // blocks until a key is pressed (0 if this task is not the foreground one)
 void sys_readline(char* buffer, int max_len);
 uint32_t sys_read_file(const char* filename, char* output_buffer, uint32_t buffer_size);  // returns bytes read
 int  sys_get_dir_entries(neodeck_dirent* dest, uint32_t max_entries);   // returns count, -1 on error
@@ -32,5 +32,10 @@ int  sys_stat(const char* path, neodeck_stat* out);
 void sys_exit(int status) __attribute__((noreturn));
 void sys_sleep(uint32_t milliseconds);
 uint32_t sys_uptime_ms();
+void sys_yield();                                   // let other tasks run
+uint32_t sys_getpid();
+int  sys_spawn(const char* cmdline, uint32_t flags); // "file arg1 arg2"; returns the child's pid or <0
+int  sys_wait(int pid, int* status);                // 0 = ok, -1 = cannot wait for that pid
+int  sys_kill(int pid);
 
 #endif

@@ -11,6 +11,7 @@
 #include "../shell/editor.h"
 #include "../drivers/keyboard.h"
 #include "execve.h"
+#include "task.h"
 #include "../drivers/timer.h"
 
 #define COMMAND_BUFFER_SIZE 256
@@ -98,7 +99,10 @@ void parse_command(const char* cmd) {
         kprint("  meminfo   - Display kernel heap memory usage stats\n");
         kprint("  uptime    - Time since boot\n");
         kprint("  sleep <ms> - Sleep for N milliseconds\n");
-        kprint("  exec <file> [args] - Run an app binary with arguments\n");
+        kprint("  exec <file> [args] - Run an app in the foreground (Ctrl+C aborts it)\n");
+        kprint("  spawn <file> [args] - Start an app in the background\n");
+        kprint("  ps        - List tasks\n");
+        kprint("  kill <pid> - Terminate a task\n");
         kprint("  edit <file> - Open the text editor\n");
     } 
     else if (kstrcmp(cmd, "clear") == 0) {
@@ -115,6 +119,20 @@ void parse_command(const char* cmd) {
     }
     else if (kstrncmp(cmd, "exec ", 5) == 0) {
         sys_exec(cmd + 5);
+    }
+    else if (kstrncmp(cmd, "spawn ", 6) == 0) {
+        int pid = exec_spawn(cmd + 6, true);
+        if (pid >= 0) { kprint("Started pid "); kprint_dec((uint32_t)pid); kprint(" in the background.\n"); }
+    }
+    else if (kstrcmp(cmd, "ps") == 0) {
+        task_print_list();
+    }
+    else if (kstrncmp(cmd, "kill ", 5) == 0) {
+        int pid = (int)katou(cmd + 5);
+        int r = task_kill(pid);
+        if (r == 0) { kprint("Killed pid "); kprint_dec((uint32_t)pid); kprint(".\n"); }
+        else if (r == -2) kprint_error("kill: that task cannot be killed (idle / kernel thread).\n");
+        else kprint_error("kill: no such task.\n");
     }
     else if (kstrncmp(cmd, "mkdir ", 6) == 0) {
         const char* dir_name = cmd + 6;
@@ -208,4 +226,16 @@ void parse_command(const char* cmd) {
     kprint("\n");
     kprint(fs_cwd());
     kprint("> ");
+}
+
+
+void shell_main() {
+    task_set_shell(task_current_pid());          /* the shell owns the keyboard by default */
+
+    kprint("System ready. Type 'help' for a list of supported commands.\n");
+    kprint("\n/> ");
+
+    while (1) {
+        shell_handle_char(keyboard_get_char());
+    }
 }

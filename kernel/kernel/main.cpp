@@ -11,8 +11,10 @@
 #include "../drivers/timer.h"
 #include "../memory/memory.h"
 #include "../fs/fs.h"
+#include "gdt.h"
+#include "paging.h"
+#include "task.h"
 
-extern void paging_init();
 extern "C" void enable_paging(uint32_t page_directory_address);
 
 /* .bss (including the heap bitmap) is zeroed by kernel_entry.asm before main. */
@@ -21,6 +23,9 @@ extern "C" void main() {
 
     kprint("Booting NeoDeck...\n");
     kprint_log("Kernel .bss cleared, stack ready.\n");
+
+    gdt_init();
+    kprint_log("GDT with user segments and TSS loaded.\n");
 
     idt_init();
     kprint_log("IDT loaded (CPU exceptions 0-31 -> panic screen).\n");
@@ -37,14 +42,17 @@ extern "C" void main() {
     enable_paging(PAGE_DIRECTORY_ADDRESS);
     kprint_log("Virtual memory architecture operational!\n");
 
+    fs_init();
+
+    task_init();
+    task_create_kthread("shell", shell_main);
+    kprint_log("Scheduler online (pid 0 = idle, pid 1 = shell).\n");
+
+    /* From here on main() is the idle task: it only runs when nothing else can.
+     * The shell and every app are tasks; the timer preempts ring-3 code. */
     asm volatile("sti");
-
-    fs_init();   /* needs no interrupts, but keep boot messages in order */
-    kprint("System ready. Type 'help' for a list of supported commands.\n");
-    kprint("\n/> ");
-
-    /* The IRQ only fills the keyboard ring buffer; the shell runs here. */
     while (1) {
-        shell_handle_char(keyboard_get_char());
+        task_yield();
+        asm volatile("sti; hlt");
     }
 }

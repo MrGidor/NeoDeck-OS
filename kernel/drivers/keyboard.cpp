@@ -2,6 +2,7 @@
 #include "io.h"
 #include "pic.h"
 #include "../kernel/irq.h"
+#include "../kernel/task.h"
 
 static const char keyboard_map[] = {
     0,  27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
@@ -19,10 +20,16 @@ static volatile char     buffer[KEYBOARD_BUFFER_SIZE];
 static volatile uint32_t head = 0;
 static volatile uint32_t tail = 0;
 
+static volatile bool ctrl_down = false;
+static volatile bool ctrl_c    = false;
+
 static void keyboard_irq() {
     uint8_t scancode = inb(0x60);
 
+    if (scancode == 0x1D) { ctrl_down = true;  return; }    /* Ctrl press   */
+    if (scancode == 0x9D) { ctrl_down = false; return; }    /* Ctrl release */
     if (scancode & 0x80) return;                    /* key release */
+    if (ctrl_down && scancode == 0x2E) { ctrl_c = true; return; }   /* Ctrl+C */
     if (scancode >= sizeof(keyboard_map)) return;   /* extended / unmapped */
 
     char c = keyboard_map[scancode];
@@ -37,6 +44,7 @@ static void keyboard_irq() {
 
 void keyboard_init() {
     head = tail = 0;
+    ctrl_down = ctrl_c = false;
     irq_install_handler(1, keyboard_irq);
     pic_unmask_irq(1);
 }
@@ -52,9 +60,13 @@ char keyboard_pop_char() {
     return c;
 }
 
+bool keyboard_ctrl_c_pending() { return ctrl_c; }
+void keyboard_ctrl_c_clear()   { ctrl_c = false; }
+
 char keyboard_get_char() {
     while (!keyboard_has_chars()) {
-        asm volatile("sti; hlt");   /* sleep until the next interrupt */
+        if (task_scheduler_active()) task_block_on_key();   /* sleep until IRQ1 queues a key */
+        else asm volatile("sti; hlt");                      /* early boot: no scheduler yet */
     }
     return keyboard_pop_char();
 }

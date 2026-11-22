@@ -1,9 +1,11 @@
-/* Apps are loaded by `exec` at the start of the kernel heap, which is where
- * kmalloc places the first block when the heap is otherwise empty. */
+/* Every app is linked at the same virtual address. The kernel gives each task
+ * its own page directory that maps this window onto the task's private RAM, so
+ * two apps can run at once without ever seeing each other's memory.
+ * Must equal APP_VIRT_BASE in kernel/include/layout.h (build_app.sh checks). */
 ENTRY(main)
 SECTIONS
 {
-    . = 0x1000000;   /* must equal KERNEL_HEAP_START in kernel/include/layout.h */
+    . = 0x40000000;
     .text   : { *(.text.entry) *(.text .text.*) }
     .rodata : { *(.rodata .rodata.*) }
     .data   : { *(.data .data.*) }

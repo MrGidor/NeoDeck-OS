@@ -9,8 +9,6 @@ global default_stub_handler
 global isr80
 global isr_stub_table
 global irq_stub_table
-global app_enter
-global app_exit
 
 extern main
 extern exception_handler
@@ -163,10 +161,12 @@ IRQ_STUB 15
 irq_common:
     pusha
     cld
-    mov eax, [esp + 32]         ; IRQ number sits above the pusha block
+    mov eax, esp                ; pointer to the saved registers (struct irq_frame)
     push eax
-    call irq_dispatch
-    add esp, 4
+    mov eax, [esp + 36]         ; IRQ number: above the pusha block (32) + the push above (4)
+    push eax
+    call irq_dispatch           ; irq_dispatch(irq, frame)
+    add esp, 8
     popa
     add esp, 4                  ; drop the IRQ number
     iret
@@ -186,37 +186,6 @@ isr80:
     add esp, 4
     popa                        ; EAX now holds the syscall result
     iret
-
-; ---------------------------------------------------------------------------
-; int app_enter(void* entry, int argc, char** argv)
-; Calls entry(argc, argv) and returns its result. app_exit(status) from
-; anywhere (even inside a syscall) abandons the app's stack and makes this
-; function return `status`, which is how sys_exit works.
-; ---------------------------------------------------------------------------
-app_enter:
-    push ebp
-    push ebx
-    push esi
-    push edi
-    mov [app_saved_esp], esp
-    mov eax, [esp + 20]         ; entry
-    mov ecx, [esp + 24]         ; argc
-    mov edx, [esp + 28]         ; argv
-    push edx
-    push ecx
-    call eax
-.restore:
-    mov esp, [app_saved_esp]
-    pop edi
-    pop esi
-    pop ebx
-    pop ebp
-    ret
-
-app_exit:
-    mov eax, [esp + 4]          ; status
-    cld
-    jmp app_enter.restore
 
 ; ---------------------------------------------------------------------------
 ; Tables of stub addresses for idt.cpp
@@ -254,8 +223,6 @@ kgdt_descriptor:
 ; Stacks live in .bss (zeroed above, so the stack must not be in use then).
 ; ---------------------------------------------------------------------------
 section .bss nobits alloc noexec write align=16
-app_saved_esp:  resd 1
-                resb 16
 panic_stack:    resb 4096
 panic_stack_top:
 kernel_stack:   resb KERNEL_STACK_SIZE
