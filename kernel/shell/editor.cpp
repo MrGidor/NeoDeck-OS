@@ -7,12 +7,12 @@ alignas(4) char editor_buffer[EDITOR_BUF_SIZE];
 #include "editor.h"
 #include "../drivers/terminal.h"
 #include "../drivers/keyboard.h"
-#include "../fs/neofs.h"
+#include "../fs/fs.h"
 
 void run_text_editor(const char* filename) {
     for (int i = 0; i < EDITOR_BUF_SIZE; i++) editor_buffer[i] = '\0';
     
-    int buffer_index = neofs_read_to_buffer(filename, editor_buffer, EDITOR_BUF_SIZE);
+    int buffer_index = fs_read_to_buffer(filename, editor_buffer, EDITOR_BUF_SIZE);
 
     terminal_clear();
     
@@ -80,6 +80,6 @@ void run_text_editor(const char* filename) {
 
     terminal_clear();
     
-    neofs_write(filename, editor_buffer); 
+    fs_write(filename, editor_buffer); 
     
 }

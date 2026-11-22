@@ -59,7 +59,10 @@ nasm -f bin -I "$OUT/" -DKERNEL_SECTORS="$KSECTORS" bootloader/boot.asm -o "$OUT
 cat "$OUT/boot.bin" "$OUT/full_kernel.bin" > "$OUT/OS.bin"
 truncate -s 1440k "$OUT/OS.bin"
 
-# Data disk is only created if missing so your NeoFS contents survive rebuilds
-[[ -f "$OUT/hdd.img" ]] || truncate -s 10M "$OUT/hdd.img"
+# Data disk: a 64 MB FAT32 image, only created if missing so your files survive
+# rebuilds. (An old 10 MB NeoFS image is not FAT32: delete it, or boot and run 'format'.)
+if [[ ! -f "$OUT/hdd.img" ]]; then
+    python tools/fat32img.py create "$OUT/hdd.img" 64
+fi
 
 echo "Build OK: $OUT/OS.bin"

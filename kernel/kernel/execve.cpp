@@ -1,7 +1,6 @@
 #include "../include/types.h"
 #include "execve.h"
-#include "../drivers/ata.h"
-#include "../fs/neofs.h"
+#include "../fs/fs.h"
 #include "../memory/memory.h"
 #include "../shell/string.h"
 #include "../drivers/terminal.h"
@@ -47,35 +46,13 @@ int sys_exec(const char* cmdline) {
     }
     const char* filename = argv[0];
 
-    alignas(4) uint8_t sector_buffer[512];
-    ata_read_sector(INODE_TABLE_SECTOR, sector_buffer);
-    neofs_inode* inodes = (neofs_inode*)sector_buffer;
-
-    alignas(4) uint8_t dir_buffer[512];
-    uint32_t current_dir_sector = inodes[current_directory_inode].start_sector;
-    ata_read_sector(current_dir_sector, dir_buffer);
-    neofs_dir_entry* entries = (neofs_dir_entry*)dir_buffer;
-
-    int target_inode = -1;
-    for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-        if (entries[i].used == 1 && kstrcmp(entries[i].name, filename) == 0) {
-            target_inode = entries[i].inode_num;
-            break;
-        }
-    }
-
-    if (target_inode == -1 || inodes[target_inode].type != TYPE_FILE) {
-        kprint_error("Exec Error: Executable binary not found.\n");
-        return -1;
-    }
-
-    uint32_t bin_size = inodes[target_inode].size;
+    uint32_t bin_size = fs_file_size(filename);
     if (bin_size == 0) {
-        kprint_error("Exec Error: Binary file is empty.\n");
+        kprint_error("Exec Error: Executable not found, empty, or a directory.\n");
         return -1;
     }
 
-    /* +1: neofs_read_raw_data appends a terminating NUL after the payload. */
+    /* +1 keeps a terminating NUL after the image, like the old loader did. */
     int blocks_needed = (int)((bin_size + 1 + (BLOCK_SIZE - 1)) / BLOCK_SIZE);
 
     uint8_t* program_space = (uint8_t*)kmalloc(blocks_needed);
@@ -84,7 +61,13 @@ int sys_exec(const char* cmdline) {
         return -1;
     }
 
-    neofs_read_raw_data(inodes[target_inode].start_sector, bin_size, (char*)program_space);
+    uint32_t got = fs_read_raw(filename, program_space, bin_size);
+    if (got != bin_size) {
+        kfree(program_space, blocks_needed);
+        kprint_error("Exec Error: Could not read the whole executable from disk.\n");
+        return -1;
+    }
+    program_space[bin_size] = 0;
 
     current_app_base_address = (uint32_t)program_space;
     app_running = true;

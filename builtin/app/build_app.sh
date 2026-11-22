@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage: builtin/app/build_app.sh hello      -> builtin/app/hello.bin
-# Then:  cd builtin/app && python3 app_injector.py (after editing the file name)
+# Then:  python3 builtin/app/app_injector.py builtin/app/hello.bin   (copies it onto the FAT32 disk)
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH=$PATH:/usr/local/i386elfgcc/bin
