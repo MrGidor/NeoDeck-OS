@@ -14,8 +14,8 @@ asm(
     ".pushsection .text\n"
     ".global task_switch\n"
     "task_switch:\n"
-    "    movl 4(%esp), %eax\n"          /* &old->esp */
-    "    movl 8(%esp), %edx\n"          /* new esp   */
+    "    movl 4(%esp), %eax\n"
+    "    movl 8(%esp), %edx\n"
     "    pushl %ebp\n"
     "    pushl %ebx\n"
     "    pushl %esi\n"

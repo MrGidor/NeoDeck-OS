@@ -1,6 +1,5 @@
 #include "../include/types.h"
 
-// A temporary buffer in kernel heap/BSS to hold our active file text
 #define EDITOR_BUF_SIZE 4096
 alignas(4) char editor_buffer[EDITOR_BUF_SIZE];
 
@@ -18,7 +17,7 @@ void run_text_editor(const char* filename) {
     
     uint8_t old_color = terminal_color;
     terminal_color = 0x70; 
-    kprint(" NeoDeck Editor v1.0 | File: ");
+    kprint(" Vista Editor v1.0 | File: ");
     kprint(filename);
     kprint(" | Press ESC to Save and Exit \n");
     terminal_color = old_color; 
@@ -34,7 +33,7 @@ void run_text_editor(const char* filename) {
     int editing = 1;
     while (editing) {
 
-        char c = keyboard_get_char();   // blocks in hlt, no polling
+        char c = keyboard_get_char();
 
         if (c == 27) { 
             editing = 0;
@@ -70,7 +69,6 @@ void run_text_editor(const char* filename) {
             }
             continue;
         }
-
 
         if (buffer_index < EDITOR_BUF_SIZE - 1) {
             editor_buffer[buffer_index++] = c;

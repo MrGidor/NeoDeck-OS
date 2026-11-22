@@ -1,5 +1,5 @@
-#ifndef NEODECK_TYPES_H
-#define NEODECK_TYPES_H
+#ifndef VISTA_TYPES_H
+#define VISTA_TYPES_H
 
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;

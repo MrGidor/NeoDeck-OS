@@ -9,8 +9,6 @@ void irq_install_handler(uint8_t irq, irq_handler_t handler) {
     if (irq < 16) irq_handlers[irq] = handler;
 }
 
-/* Called from irq_common in kernel_entry.asm with the IRQ number (0-15) and a
- * pointer to the saved registers / interrupt frame. */
 extern "C" __attribute__((cdecl)) void irq_dispatch(uint32_t irq, irq_frame* frame) {
     if (irq == 7 || irq == 15) {
         if (pic_is_spurious((uint8_t)irq)) {

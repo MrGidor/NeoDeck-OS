@@ -31,34 +31,33 @@ struct task_t {
     task_state_t state;
     char         name[TASK_NAME_MAX];
     bool         is_user;
-    bool         detached;      /* nobody will wait for it: slot is freed as soon as it dies */
-    bool         needs_free;    /* DEAD but kernel stack / memory not released yet */
+    bool         detached;
+    bool         needs_free;
 
-    uint32_t     esp;           /* saved kernel ESP while not running */
-    uint32_t     kstack_base;   /* heap block (0 for the idle/boot context) */
+    uint32_t     esp;
+    uint32_t     kstack_base;
     uint32_t     kstack_top;
-    uint32_t     page_dir;      /* physical address for CR3 */
-    uint32_t     page_table;    /* user tasks: private page table of the app window */
-    uint32_t     mem_base;      /* user tasks: physical base of the app's RAM */
-    void       (*entry)();      /* kernel threads */
+    uint32_t     page_dir;
+    uint32_t     page_table;
+    uint32_t     mem_base;
+    void       (*entry)();
 
     task_wait_t  wait;
-    uint32_t     wake_tick;     /* WAIT_SLEEP */
-    uint32_t     wait_pid;      /* WAIT_PID */
-    bool         interruptible; /* WAIT_PID can be broken by Ctrl+C */
+    uint32_t     wake_tick;
+    uint32_t     wait_pid;
+    bool         interruptible;
 
     int          exit_status;
     uint32_t     parent_pid;
-    uint32_t     cpu_ticks;     /* timer ticks spent running */
+    uint32_t     cpu_ticks;
 };
 
 /* Exit status of a task killed by a CPU exception = TASK_FAULT_BASE + vector */
 #define TASK_FAULT_BASE   1000
 #define TASK_KILLED       (-1)
 
-/* ---- setup ---- */
-void     task_init();                                   /* adopt the boot context as pid 0 */
-int      task_create_kthread(const char* name, void (*entry)());   /* pid, or negative */
+void     task_init();
+int      task_create_kthread(const char* name, void (*entry)());
 
 /* Create a ring-3 task from a flat binary (entry = first byte), copying `image`
  * into freshly allocated private RAM. Returns pid, or:
@@ -66,28 +65,25 @@ int      task_create_kthread(const char* name, void (*entry)());   /* pid, or ne
 int      task_create_user(const char* name, const uint8_t* image, uint32_t image_size,
                           int argc, char** argv, bool detached);
 
-/* ---- scheduling ---- */
 void     task_yield();
 void     task_exit(int status) __attribute__((noreturn));
 void     task_sleep_ticks(uint32_t ticks);
-void     task_block_on_key();                           /* until a key is available AND we are foreground */
+void     task_block_on_key();
 int      task_wait(int pid, int* status, bool interruptible);   /* 0 ok, -1 not waitable, -2 interrupted */
 int      task_kill(int pid);                            /* 0 ok, -1 no such task, -2 not killable */
-void     task_timer_tick(bool from_user);               /* called from IRQ0 after the EOI */
+void     task_timer_tick(bool from_user);
 
-/* ---- queries ---- */
-const task_t* task_find(uint32_t pid);                 /* read-only view of a task (ps, tests) */
+const task_t* task_find(uint32_t pid);
 bool     task_scheduler_active();
 uint32_t task_current_pid();
 bool     task_current_is_user();
 const char* task_current_name();
-bool     task_is_foreground();                          /* may the caller read the keyboard? */
-void     task_set_shell(uint32_t pid);                  /* the shell owns the keyboard by default */
+bool     task_is_foreground();
+void     task_set_shell(uint32_t pid);
 void     task_set_foreground(uint32_t pid);
 void     task_reset_foreground();
-void     task_print_list();                             /* `ps` */
+void     task_print_list();
 
-/* A ring-3 task raised a CPU exception: report it and terminate the task. */
 void     task_handle_user_fault(uint32_t vector, uint32_t eip, uint32_t cr2, uint32_t error_code)
              __attribute__((noreturn));
 

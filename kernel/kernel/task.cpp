@@ -1,6 +1,6 @@
 #include "../include/types.h"
 #include "../include/layout.h"
-#include "neodeck_abi.h"
+#include "vista_abi.h"
 #include "task.h"
 #include "task_arch.h"
 #include "gdt.h"
@@ -12,22 +12,19 @@
 
 #define KSTACK_BLOCKS    (TASK_KSTACK_SIZE / BLOCK_SIZE)
 #define APP_MEM_BLOCKS   (APP_MEM_SIZE / BLOCK_SIZE)
-#define EFLAGS_RESERVED  0x00000002u     /* bit 1 is always set */
+#define EFLAGS_RESERVED  0x00000002u
 #define EFLAGS_IF        0x00000200u
 #define MAX_TASK_ARGS    32
 #define TRAMPOLINE_SIZE  16
 
 static task_t   tasks[TASK_MAX];
 static task_t*  current       = 0;
-static uint32_t next_pid      = 1;       /* pid 0 is the idle task */
+static uint32_t next_pid      = 1;
 static uint32_t shell_pid     = 0;
-static uint32_t foreground_pid = 0;      /* the only task allowed to read the keyboard */
+static uint32_t foreground_pid = 0;
 static int      slice_left    = 0;
 static bool     sched_active  = false;
 
-/* ------------------------------------------------------------------ */
-/* helpers                                                             */
-/* ------------------------------------------------------------------ */
 static uint32_t str_len(const char* s) { uint32_t n = 0; while (s[n]) n++; return n; }
 
 static void str_copy(char* dst, const char* src, uint32_t max) {
@@ -56,7 +53,7 @@ static task_t* find_task(uint32_t pid) {
 }
 
 static task_t* alloc_slot() {
-    for (int i = 1; i < TASK_MAX; i++) {          /* slot 0 belongs to the idle task */
+    for (int i = 1; i < TASK_MAX; i++) {
         if (!tasks[i].used) {
             task_clear(&tasks[i]);
             tasks[i].used = true;                 /* reserved; callers undo on failure */
@@ -69,17 +66,14 @@ static task_t* alloc_slot() {
 /* The frame task_switch() expects: pop order eflags, edi, esi, ebx, ebp, ret. */
 static uint32_t* push_switch_frame(uint32_t* sp, uint32_t return_address) {
     *--sp = return_address;
-    *--sp = 0;                       /* ebp */
-    *--sp = 0;                       /* ebx */
-    *--sp = 0;                       /* esi */
-    *--sp = 0;                       /* edi */
+    *--sp = 0;
+    *--sp = 0;
+    *--sp = 0;
+    *--sp = 0;
     *--sp = EFLAGS_RESERVED;         /* eflags, interrupts off until the task starts itself */
     return sp;
 }
 
-/* ------------------------------------------------------------------ */
-/* the scheduler                                                       */
-/* ------------------------------------------------------------------ */
 static task_t* wait_target(const task_t* t) { return find_task(t->wait_pid); }
 
 static bool wake_ready(const task_t* t) {
@@ -98,14 +92,13 @@ static bool wake_ready(const task_t* t) {
     }
 }
 
-/* Round robin starting after the current task; the idle task is the fallback. */
 static task_t* pick_next() {
     int start = (int)(current - tasks);
     for (int n = 1; n <= TASK_MAX; n++) {
         task_t* t = &tasks[(start + n) % TASK_MAX];
         if (!t->used || t == &tasks[0]) continue;
         if (t->state == TASK_BLOCKED && wake_ready(t)) t->state = TASK_READY;
-        if (t->state == TASK_READY || t->state == TASK_RUNNING) return t;   /* RUNNING = current, still runnable */
+        if (t->state == TASK_READY || t->state == TASK_RUNNING) return t;
     }
     return &tasks[0];
 }
@@ -178,7 +171,7 @@ void task_timer_tick(bool from_user) {
 }
 
 void task_sleep_ticks(uint32_t ticks) {
-    if (!sched_active || current == &tasks[0]) {      /* idle must never block */
+    if (!sched_active || current == &tasks[0]) {
         uint32_t start = timer_ticks();
         while ((int32_t)(timer_ticks() - start) < (int32_t)ticks) arch_halt();
         return;
@@ -196,9 +189,6 @@ void task_block_on_key() {
     schedule();
 }
 
-/* ------------------------------------------------------------------ */
-/* lifetime                                                            */
-/* ------------------------------------------------------------------ */
 void task_init() {
     for (int i = 0; i < TASK_MAX; i++) task_clear(&tasks[i]);
     task_t* idle = &tasks[0];
@@ -241,7 +231,7 @@ extern "C" void task_kthread_main() {
 
 static const uint8_t exit_trampoline[] = {
     0x89, 0xC3,                                                  /* mov ebx, eax (main's return value) */
-    0xB8, NEODECK_SYS_EXIT & 0xFF, (NEODECK_SYS_EXIT >> 8) & 0xFF, 0, 0,   /* mov eax, SYS_EXIT */
+    0xB8, VISTA_SYS_EXIT & 0xFF, (VISTA_SYS_EXIT >> 8) & 0xFF, 0, 0,   /* mov eax, SYS_EXIT */
     0xCD, 0x80,                                                  /* int 0x80 */
     0xEB, 0xFE                                                   /* jmp $ (never reached) */
 };
@@ -275,7 +265,7 @@ int task_create_user(const char* name, const uint8_t* image, uint32_t image_size
     for (uint32_t i = 0; i < APP_MEM_SIZE / 4; i++) words[i] = 0;
     for (uint32_t i = 0; i < image_size; i++) mem[i] = image[i];
 
-    uint32_t top = APP_MEM_SIZE;                      /* offsets inside the app window */
+    uint32_t top = APP_MEM_SIZE;
     top -= TRAMPOLINE_SIZE;
     uint32_t tramp_off = top;
     for (uint32_t i = 0; i < sizeof(exit_trampoline); i++) mem[tramp_off + i] = exit_trampoline[i];
@@ -304,11 +294,11 @@ int task_create_user(const char* name, const uint8_t* image, uint32_t image_size
     /* Kernel stack of the new task: the switch frame, whose return address is
      * the user entry stub, which then irets through this ring-3 frame. */
     uint32_t* sp = (uint32_t*)(kstack + TASK_KSTACK_SIZE);
-    *--sp = SEL_USER_DATA;                            /* ss     */
-    *--sp = user_esp;                                 /* esp    */
-    *--sp = EFLAGS_RESERVED | EFLAGS_IF;              /* eflags */
-    *--sp = SEL_USER_CODE;                            /* cs     */
-    *--sp = APP_VIRT_BASE;                            /* eip: entry = first byte of the binary */
+    *--sp = SEL_USER_DATA;
+    *--sp = user_esp;
+    *--sp = EFLAGS_RESERVED | EFLAGS_IF;
+    *--sp = SEL_USER_CODE;
+    *--sp = APP_VIRT_BASE;
     sp = push_switch_frame(sp + 0, (uint32_t)task_user_entry_stub);
 
     t->pid         = next_pid++;
@@ -332,7 +322,7 @@ static void release_children(uint32_t pid) {
         task_t* c = &tasks[i];
         if (!c->used || c->parent_pid != pid) continue;
         c->detached = true;
-        if (c->state == TASK_DEAD && !c->needs_free) c->used = false;   /* zombie already cleaned up */
+        if (c->state == TASK_DEAD && !c->needs_free) c->used = false;
     }
 }
 
@@ -358,14 +348,14 @@ void task_exit(int status) {
     if (foreground_pid == t->pid) foreground_pid = shell_pid;
     if (t->detached && t->is_user) announce_exit(t);
 
-    schedule();                                       /* DEAD tasks are never picked again */
+    schedule();
     for (;;) arch_halt();
 }
 
 int task_kill(int pid) {
     task_t* t = find_task((uint32_t)pid);
     if (!t || t->state == TASK_DEAD) return -1;
-    if (!t->is_user) return -2;                       /* idle and kernel threads are not killable */
+    if (!t->is_user) return -2;
 
     if (t == current) task_exit(TASK_KILLED);
 
@@ -375,7 +365,7 @@ int task_kill(int pid) {
     t->needs_free  = true;
     release_children(t->pid);
     if (foreground_pid == t->pid) foreground_pid = shell_pid;
-    reap_dead_tasks();                                /* it is not running, free it right away */
+    reap_dead_tasks();
     arch_irq_restore(flags);
     return 0;
 }
@@ -413,9 +403,6 @@ void task_handle_user_fault(uint32_t vector, uint32_t eip, uint32_t cr2, uint32_
     task_exit((int)(TASK_FAULT_BASE + vector));
 }
 
-/* ------------------------------------------------------------------ */
-/* queries                                                             */
-/* ------------------------------------------------------------------ */
 const task_t* task_find(uint32_t pid) { return find_task(pid); }
 bool        task_scheduler_active() { return sched_active; }
 uint32_t    task_current_pid()      { return current ? current->pid : 0; }

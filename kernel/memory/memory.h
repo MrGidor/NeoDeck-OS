@@ -1,7 +1,7 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include "../include/layout.h"   /* KERNEL_HEAP_START / KERNEL_HEAP_SIZE */
+#include "../include/layout.h"
 #define BLOCK_SIZE 512
 #define BITMAP_SIZE (KERNEL_HEAP_SIZE / BLOCK_SIZE)
 

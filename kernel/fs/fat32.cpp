@@ -24,9 +24,6 @@
 #define FAT_DEFAULT_DATE 0x5821       /* 2024-01-01 (no RTC yet) */
 #define LFN_CHARS_PER_ENTRY 13
 
-/* ------------------------------------------------------------------ */
-/* little helpers                                                      */
-/* ------------------------------------------------------------------ */
 static inline uint16_t rd16(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] << 8)); }
 static inline uint32_t rd32(const uint8_t* p) {
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -57,23 +54,20 @@ static bool ci_equal(const char* a, const char* b) {
 
 static uint32_t str_len(const char* s) { uint32_t n = 0; while (s[n]) n++; return n; }
 
-/* ------------------------------------------------------------------ */
-/* volume state                                                        */
-/* ------------------------------------------------------------------ */
 static struct {
     bool     mounted;
     uint32_t part_lba;
     uint32_t total_sectors;
-    uint32_t spc;            /* sectors per cluster */
+    uint32_t spc;
     uint32_t reserved;
     uint32_t nfats;
-    uint32_t fat_size;       /* sectors per FAT */
-    uint32_t fat_lba;        /* first sector of FAT #1 (absolute) */
-    uint32_t data_lba;       /* first sector of cluster 2 (absolute) */
+    uint32_t fat_size;
+    uint32_t fat_lba;
+    uint32_t data_lba;
     uint32_t root_cluster;
     uint32_t cluster_count;
-    uint32_t fsinfo_lba;     /* 0 = none */
-    uint32_t free_count;     /* FSINFO_UNKNOWN if not known */
+    uint32_t fsinfo_lba;
+    uint32_t free_count;
     uint32_t next_free;
     bool     fsinfo_dirty;
 } vol;
@@ -82,7 +76,7 @@ static uint32_t cwd_cluster = 0;
 static char     cwd_path[FAT32_PATH_MAX] = "/";
 
 alignas(4) static uint8_t fat_buf[SECTOR_SIZE];
-static uint32_t fat_buf_sector = 0xFFFFFFFFu;     /* index inside the FAT */
+static uint32_t fat_buf_sector = 0xFFFFFFFFu;
 
 bool fat32_is_mounted() { return vol.mounted; }
 const char* fat32_cwd() { return cwd_path; }
@@ -92,9 +86,6 @@ uint32_t fat32_total_clusters() { return vol.cluster_count; }
 static inline bool valid_cluster(uint32_t c) { return c >= 2 && c < vol.cluster_count + 2; }
 static inline uint32_t cluster_lba(uint32_t c) { return vol.data_lba + (c - 2) * vol.spc; }
 
-/* ------------------------------------------------------------------ */
-/* FAT access (one-sector write-through cache, both FAT copies kept)   */
-/* ------------------------------------------------------------------ */
 static void fat_load(uint32_t fat_sec) {
     if (fat_buf_sector != fat_sec) {
         ata_read_sector(vol.fat_lba + fat_sec, fat_buf);
@@ -178,13 +169,10 @@ uint32_t fat32_free_clusters() {
     return vol.free_count;
 }
 
-/* ------------------------------------------------------------------ */
-/* directory iteration (with long-name assembly)                       */
-/* ------------------------------------------------------------------ */
 struct dir_iter {
-    uint32_t cluster;     /* current cluster, 0 = finished */
-    uint32_t sec;         /* sector inside the cluster */
-    uint32_t idx;         /* entry inside the sector */
+    uint32_t cluster;
+    uint32_t sec;
+    uint32_t idx;
     uint32_t lba;
     bool     loaded;
     alignas(4) uint8_t buf[SECTOR_SIZE];
@@ -244,7 +232,6 @@ static void sfn_to_name(const uint8_t* e, char* out) {
     out[n] = '\0';
 }
 
-/* Reads the next live file/directory entry. Returns false at end of directory. */
 static bool dir_next(dir_iter* it, fat32_dirent* out) {
     static const uint8_t lfn_pos[LFN_CHARS_PER_ENTRY] = {1,3,5,7,9, 14,16,18,20,22,24, 28,30};
 
@@ -296,7 +283,6 @@ static bool dir_next(dir_iter* it, fat32_dirent* out) {
 
         if (attr & FAT_ATTR_VOLUME) { lfn_ok = false; lfn_n = 0; continue; }   /* volume label */
 
-        /* regular 8.3 entry */
         for (int i = 0; i < 11; i++) out->sfn[i] = e[i];
         out->attr    = attr;
         out->cluster = ((uint32_t)rd16(e + 20) << 16) | rd16(e + 26);
@@ -339,21 +325,18 @@ static int find_in_dir(uint32_t dir_cluster, const char* name, fat32_dirent* out
     return FAT_E_NOTFOUND;
 }
 
-/* ------------------------------------------------------------------ */
-/* directory entry writing                                             */
-/* ------------------------------------------------------------------ */
 static void put_entry(uint8_t* e, const uint8_t sfn[11], uint8_t nt, uint8_t attr,
                       uint32_t cluster, uint32_t size) {
     mem_zero(e, 32);
     for (int i = 0; i < 11; i++) e[i] = sfn[i];
     e[11] = attr;
     e[12] = nt;
-    wr16(e + 14, 0);                       /* create time */
-    wr16(e + 16, FAT_DEFAULT_DATE);        /* create date */
-    wr16(e + 18, FAT_DEFAULT_DATE);        /* access date */
+    wr16(e + 14, 0);
+    wr16(e + 16, FAT_DEFAULT_DATE);
+    wr16(e + 18, FAT_DEFAULT_DATE);
     wr16(e + 20, (uint16_t)(cluster >> 16));
-    wr16(e + 22, 0);                       /* write time */
-    wr16(e + 24, FAT_DEFAULT_DATE);        /* write date */
+    wr16(e + 22, 0);
+    wr16(e + 24, FAT_DEFAULT_DATE);
     wr16(e + 26, (uint16_t)cluster);
     wr32(e + 28, size);
 }
@@ -405,7 +388,6 @@ static void entry_update(uint32_t lba, uint16_t off, uint32_t cluster, uint32_t 
     ata_write_sector(lba, buf);
 }
 
-/* Marks the 8.3 entry and all its long-name entries as deleted. */
 static void entry_delete(const fat32_dirent* e) {
     alignas(4) uint8_t buf[SECTOR_SIZE];
     for (uint32_t i = 0; i < e->lfn_count; i++) {
@@ -418,9 +400,6 @@ static void entry_delete(const fat32_dirent* e) {
     ata_write_sector(e->lba, buf);
 }
 
-/* ------------------------------------------------------------------ */
-/* names                                                               */
-/* ------------------------------------------------------------------ */
 static bool sfn_char_ok(char c) {
     if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) return true;
     const char* extra = "$%'-_@~!(){}^#&";
@@ -468,10 +447,6 @@ int fat32_make_sfn(const char* name, uint8_t sfn[11], uint8_t* nt_flags) {
     return FAT_OK;
 }
 
-/* ------------------------------------------------------------------ */
-/* paths                                                               */
-/* ------------------------------------------------------------------ */
-/* Copies the next path component into comp; returns false when none are left. */
 static bool next_component(const char** pp, char* comp, int* too_long) {
     const char* p = *pp;
     while (*p == '/') p++;
@@ -550,7 +525,6 @@ static int resolve_dir(const char* path, uint32_t* out_cluster, char* path_out) 
     return FAT_OK;
 }
 
-/* Splits "a/b/leaf" into the cluster of "a/b" and the leaf name. */
 static int split_path(const char* path, uint32_t* parent, char* leaf) {
     char tmp[FAT32_PATH_MAX];
     uint32_t n = str_len(path);
@@ -558,8 +532,8 @@ static int split_path(const char* path, uint32_t* parent, char* leaf) {
     if (n >= FAT32_PATH_MAX) return FAT_E_TOOLONG;
     for (uint32_t i = 0; i <= n; i++) tmp[i] = path[i];
 
-    while (n > 1 && tmp[n - 1] == '/') tmp[--n] = '\0';       /* trailing slashes */
-    if (n == 1 && tmp[0] == '/') return FAT_E_INVAL;          /* the root has no name */
+    while (n > 1 && tmp[n - 1] == '/') tmp[--n] = '\0';
+    if (n == 1 && tmp[0] == '/') return FAT_E_INVAL;
 
     int slash = -1;
     for (int i = (int)n - 1; i >= 0; i--) if (tmp[i] == '/') { slash = i; break; }
@@ -594,18 +568,15 @@ static int lookup(const char* path, fat32_dirent* out, uint32_t* parent_out) {
     return find_in_dir(parent, leaf, out);
 }
 
-/* ------------------------------------------------------------------ */
-/* mount                                                               */
-/* ------------------------------------------------------------------ */
 static bool looks_like_fat32_bpb(const uint8_t* s) {
     if (rd16(s + 510) != 0xAA55) return false;
-    if (rd16(s + 11) != SECTOR_SIZE) return false;             /* bytes per sector */
+    if (rd16(s + 11) != SECTOR_SIZE) return false;
     uint8_t spc = s[13];
-    if (spc == 0 || (spc & (spc - 1)) != 0) return false;      /* power of two */
-    if (rd16(s + 14) == 0) return false;                       /* reserved sectors */
-    if (s[16] == 0) return false;                              /* number of FATs */
-    if (rd16(s + 17) != 0 || rd16(s + 22) != 0) return false;  /* FAT12/16 fields */
-    if (rd32(s + 36) == 0) return false;                       /* FAT32 sectors per FAT */
+    if (spc == 0 || (spc & (spc - 1)) != 0) return false;
+    if (rd16(s + 14) == 0) return false;
+    if (s[16] == 0) return false;
+    if (rd16(s + 17) != 0 || rd16(s + 22) != 0) return false;
+    if (rd32(s + 36) == 0) return false;
     return true;
 }
 
@@ -673,15 +644,12 @@ int fat32_mount() {
     return FAT_OK;
 }
 
-/* ------------------------------------------------------------------ */
-/* format                                                              */
-/* ------------------------------------------------------------------ */
 int fat32_format(const char* label, uint32_t volume_id) {
     uint32_t total = ata_total_sectors();
     if (total == 0) return FAT_E_NODISK;
-    if (total < 4200) return FAT_E_INVAL;                      /* too small for a sane FAT32 */
+    if (total < 4200) return FAT_E_INVAL;
 
-    const uint32_t spc = 1;                                    /* 512-byte clusters: simple, wastes little */
+    const uint32_t spc = 1;
     const uint32_t reserved = 32;
     const uint32_t nfats = 2;
     /* Microsoft's formula for sectors per FAT (FAT32). */
@@ -696,10 +664,9 @@ int fat32_format(const char* label, uint32_t volume_id) {
     vol.mounted = false;
     fat_buf_sector = 0xFFFFFFFFu;
 
-    /* boot sector */
     mem_zero(sec, SECTOR_SIZE);
     sec[0] = 0xEB; sec[1] = 0x58; sec[2] = 0x90;
-    const char* oem = "NEODECK ";
+    const char* oem = "VISTA   ";
     for (int i = 0; i < 8; i++) sec[3 + i] = (uint8_t)oem[i];
     wr16(&sec[11], SECTOR_SIZE);
     sec[13] = (uint8_t)spc;
@@ -731,7 +698,7 @@ int fat32_format(const char* label, uint32_t volume_id) {
     for (int i = 0; i < 8; i++) sec[82 + i] = (uint8_t)fstype[i];
     sec[510] = 0x55; sec[511] = 0xAA;
     ata_write_sector(0, sec);
-    ata_write_sector(6, sec);                /* backup copy */
+    ata_write_sector(6, sec);
 
     /* FSInfo (free count = everything except the root cluster) */
     uint32_t data_sectors = total - reserved - nfats * fat_size;
@@ -745,7 +712,6 @@ int fat32_format(const char* label, uint32_t volume_id) {
     ata_write_sector(1, sec);
     ata_write_sector(7, sec);
 
-    /* remaining reserved sectors */
     for (uint32_t s = 2; s < reserved; s++) {
         if (s == 6 || s == 7) continue;
         ata_write_sector(s, z);
@@ -766,30 +732,25 @@ int fat32_format(const char* label, uint32_t volume_id) {
         }
     }
 
-    /* empty root directory cluster */
     uint32_t data_lba = reserved + nfats * fat_size;
     for (uint32_t s = 0; s < spc; s++) ata_write_sector(data_lba + s, z);
 
     int r = fat32_mount();
     if (r != FAT_OK) return r;
 
-    /* default tree, same as the old NeoFS format */
     fat32_mkdir("home");
     fat32_mkdir("bin");
     fat32_mkdir("etc");
     fat32_mkdir("var");
     fat32_mkdir("tmp");
     const char* readme =
-        "Welcome to NeoDeck OS! This is a simple text file created on the root directory "
+        "Welcome to Vista OS! This is a simple text file created on the root directory "
         "of your FAT32 virtual disk. Feel free to explore the filesystem, create new "
         "directories and files, and write your own content.\n";
     fat32_write_file("readme.txt", readme, str_len(readme));
     return FAT_OK;
 }
 
-/* ------------------------------------------------------------------ */
-/* public operations                                                   */
-/* ------------------------------------------------------------------ */
 int fat32_chdir(const char* path) {
     if (!vol.mounted) return FAT_E_NOFS;
     uint32_t cl;
@@ -914,7 +875,6 @@ int fat32_rmdir(const char* path) {
     return FAT_OK;
 }
 
-/* Calls cb for each chunk of the file (full sectors, last one trimmed). */
 static int walk_file(const fat32_dirent* e, uint32_t limit, fat32_stream_cb cb, void* ctx) {
     alignas(4) uint8_t sec[SECTOR_SIZE];
     uint32_t remaining = e->size < limit ? e->size : limit;
@@ -983,7 +943,7 @@ int fat32_write_file(const char* path, const void* data, uint32_t len) {
     bool exists = (find_in_dir(parent, leaf, &e) == FAT_OK);
     if (exists && (e.attr & FAT_ATTR_DIR)) return FAT_E_ISDIR;
 
-    if (exists && e.cluster) free_chain(e.cluster);      /* replace: drop the old data */
+    if (exists && e.cluster) free_chain(e.cluster);
 
     const uint8_t* src = (const uint8_t*)data;
     uint32_t first = 0, prev = 0, written = 0;

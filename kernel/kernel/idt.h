@@ -23,9 +23,8 @@ extern "C" void load_idt(uint32_t idt_ptr_address);
 extern "C" void isr80();
 extern "C" void default_stub_handler();
 
-/* Tables of entry points emitted by kernel_entry.asm */
-extern "C" uint32_t isr_stub_table[32];   /* CPU exceptions, vectors 0-31   */
-extern "C" uint32_t irq_stub_table[16];   /* hardware IRQs, vectors 32-47   */
+extern "C" uint32_t isr_stub_table[32];
+extern "C" uint32_t irq_stub_table[16];
 
 #define IRQ_VECTOR_BASE 32
 

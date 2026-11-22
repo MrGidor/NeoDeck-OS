@@ -11,7 +11,7 @@ void paging_init() {
     uint32_t* page_directory = (uint32_t*)PAGE_DIRECTORY_ADDRESS;
 
     for (int i = 0; i < 1024; i++) {
-        page_directory[i] = 0x00000002;   /* not present, writable */
+        page_directory[i] = 0x00000002;
     }
 
     for (int t = 0; t < PAGING_TABLE_COUNT; t++) {
@@ -19,7 +19,7 @@ void paging_init() {
 
         for (unsigned int i = 0; i < 1024; i++) {
             uint32_t physical_address = (t * 0x400000) + (i * 4096);
-            current_table[i] = physical_address | (PAGE_PRESENT | PAGE_WRITE);   /* supervisor only */
+            current_table[i] = physical_address | (PAGE_PRESENT | PAGE_WRITE);
         }
 
         page_directory[t] = ((uint32_t)current_table) | (PAGE_PRESENT | PAGE_WRITE);
@@ -38,7 +38,7 @@ bool paging_create_user_space(uint32_t app_phys, uint32_t* pd_out, uint32_t* pt_
     }
 
     const uint32_t* kernel_pd = (const uint32_t*)PAGE_DIRECTORY_ADDRESS;
-    for (int i = 0; i < 1024; i++) pd[i] = kernel_pd[i];     /* share the kernel mapping */
+    for (int i = 0; i < 1024; i++) pd[i] = kernel_pd[i];
 
     for (int i = 0; i < 1024; i++) pt[i] = 0;
     for (uint32_t i = 0; i < APP_MEM_SIZE / 4096; i++)

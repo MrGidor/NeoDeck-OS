@@ -10,12 +10,12 @@ asm(
     ".global task_user_entry_stub\n"
     "task_user_entry_stub:\n"
     "    call task_after_switch\n"      /* reap dead tasks; keeps ESP unchanged */
-    "    movw $0x23, %ax\n"             /* SEL_USER_DATA */
+    "    movw $0x23, %ax\n"
     "    movw %ax, %ds\n"
     "    movw %ax, %es\n"
     "    movw %ax, %fs\n"
     "    movw %ax, %gs\n"
-    "    iretl\n"                       /* pops eip, cs, eflags, esp, ss -> ring 3 */
+    "    iretl\n"
 
     ".global task_kthread_entry_stub\n"
     "task_kthread_entry_stub:\n"
@@ -25,7 +25,7 @@ asm(
     "    movw %ax, %es\n"
     "    movw %ax, %fs\n"
     "    movw %ax, %gs\n"
-    "    call task_kthread_main\n"      /* runs the thread, then task_exit() */
+    "    call task_kthread_main\n"
     "1:  cli\n"
     "    hlt\n"
     "    jmp 1b\n"

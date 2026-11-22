@@ -8,7 +8,6 @@
 #include "../drivers/keyboard.h"
 
 int exec_spawn(const char* cmdline, bool detach) {
-    /* argv strings: task_create_user copies them into the new app's own stack. */
     char  arg_storage[EXEC_CMDLINE_MAX];
     char* argv[EXEC_MAX_ARGS + 1];
 
@@ -33,7 +32,6 @@ int exec_spawn(const char* cmdline, bool detach) {
         return -1;
     }
 
-    /* Staging buffer: the task constructor copies the image into the new app's RAM. */
     int blocks = (int)((bin_size + (BLOCK_SIZE - 1)) / BLOCK_SIZE);
     uint8_t* image = (uint8_t*)kmalloc(blocks);
     if (!image) {
@@ -46,7 +44,6 @@ int exec_spawn(const char* cmdline, bool detach) {
         return -1;
     }
 
-    /* Task name = file name without any directory part. */
     const char* base = filename;
     for (const char* p = filename; *p; p++) if (*p == '/') base = p + 1;
 
@@ -65,14 +62,14 @@ int sys_exec(const char* cmdline) {
     int pid = exec_spawn(cmdline, false);
     if (pid < 0) return -1;
 
-    task_set_foreground(pid);                    /* the app owns the keyboard while we wait */
+    task_set_foreground(pid);
     int status = 0;
     int r = task_wait(pid, &status, true);
-    if (r == -2) {                               /* Ctrl+C */
+    if (r == -2) {
         keyboard_ctrl_c_clear();
         task_kill(pid);
         kprint_warning("^C\n");
-        task_wait(pid, &status, false);          /* already dead: just collect it */
+        task_wait(pid, &status, false);
     }
     task_reset_foreground();
 

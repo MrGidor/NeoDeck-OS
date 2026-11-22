@@ -31,7 +31,7 @@ void timer_sleep_ms(uint32_t ms) {
     /* +1 because we may start part-way through a tick */
     uint32_t wait = (ms + TIMER_MS_PER_TICK - 1) / TIMER_MS_PER_TICK + 1;
     if (task_scheduler_active()) {
-        task_sleep_ticks(wait);              /* other tasks run meanwhile */
+        task_sleep_ticks(wait);
         return;
     }
     uint32_t start = ticks;

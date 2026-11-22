@@ -1,4 +1,4 @@
-#include "neodeck.h"
+#include "vista.h"
 
 static void print_dec(uint32_t v) {
     char buf[11]; int i = 10; buf[i] = 0;
@@ -8,7 +8,7 @@ static void print_dec(uint32_t v) {
 
 // Must be the first function in the binary (see app.ld) - the kernel calls offset 0.
 extern "C" __attribute__((section(".text.entry"))) int main(int argc, char** argv) {
-    sys_print("NeoDeck hello: ");
+    sys_print("Vista hello: ");
     print_dec(argc);
     sys_print(" argument(s)\n");
 
@@ -27,5 +27,5 @@ extern "C" __attribute__((section(".text.entry"))) int main(int argc, char** arg
     print_dec(sys_uptime_ms() - before);
     sys_print(" ms\n");
 
-    return argc;   // exit status; sys_exit(n) from anywhere works too
+    return argc;
 }

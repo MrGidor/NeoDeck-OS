@@ -4,10 +4,9 @@
 %ifndef KERNEL_SECTORS
     %error "KERNEL_SECTORS not defined - build with build.sh"
 %endif
-%include "layout.inc"           ; KERNEL_BASE, BOOT_STAGE_ADDRESS (generated)
+%include "layout.inc"           ; KERNEL_BASE, BOOT_STAGE_ADDRESS
 
-; Floppy geometry (1.44 MB image). The kernel is read one sector at a time
-; so track/head boundaries and the 64 KB DMA boundary can never bite us.
+; Floppy geometry (1.44 MB image) for now. The kernel is read one sector at a time
 SECTORS_PER_TRACK equ 18
 HEADS             equ 2
 STAGE_SEGMENT     equ BOOT_STAGE_ADDRESS >> 4
@@ -101,7 +100,7 @@ enable_a20:
     cmp al, 0xFF                    ; 0xFF = port not present
     je .done
     or al, 2
-    and al, 0xFE                    ; never set bit 0 (system reset)
+    and al, 0xFE                    ; never set bit 0
     out 0x92, al
 .done:
     ret

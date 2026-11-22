@@ -12,7 +12,7 @@ BASE=$(grep -E '^#define[[:space:]]+APP_VIRT_BASE' ../../kernel/include/layout.h
 grep -q "\. = $BASE;" app.ld || { echo "app.ld base does not match APP_VIRT_BASE ($BASE) in layout.h" >&2; exit 1; }
 
 FLAGS="-ffreestanding -m32 -fno-pic -fno-pie -fno-exceptions -fno-rtti -fno-stack-protector -fno-asynchronous-unwind-tables -I../sdk/include"
-$CC $FLAGS -c ../sdk/src/neodeck.cpp -o sdk.o
+$CC $FLAGS -c ../sdk/src/vista.cpp -o sdk.o
 for name in "$@"; do
     $CC $FLAGS -c "$name.cpp" -o "$name.o"
     $LD -m elf_i386 -T app.ld -o "$name.elf" "$name.o" sdk.o

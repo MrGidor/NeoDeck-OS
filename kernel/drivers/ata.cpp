@@ -43,22 +43,22 @@ void ata_write_sector(uint32_t target_sector, uint8_t* source_buffer) {
 }
 
 uint32_t ata_total_sectors() {
-    outb(0x1F6, 0xA0);                         // primary bus, master
+    outb(0x1F6, 0xA0);
     outb(0x1F2, 0);
     outb(0x1F3, 0);
     outb(0x1F4, 0);
     outb(0x1F5, 0);
     outb(0x1F7, 0xEC);                         // IDENTIFY
 
-    if (inb(0x1F7) == 0) return 0;             // nothing attached
+    if (inb(0x1F7) == 0) return 0;
 
     int spin = 0;
-    while ((inb(0x1F7) & 0x80) && ++spin < 1000000);   // wait for BSY to clear
+    while ((inb(0x1F7) & 0x80) && ++spin < 1000000);
     if (inb(0x1F4) || inb(0x1F5)) return 0;    // ATAPI / SATA signature: not a plain disk
 
     uint8_t status;
     spin = 0;
-    while (!((status = inb(0x1F7)) & 0x09) && ++spin < 1000000);   // DRQ or ERR
+    while (!((status = inb(0x1F7)) & 0x09) && ++spin < 1000000);
     if (!(status & 0x08)) return 0;
 
     uint16_t id[256];

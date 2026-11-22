@@ -17,9 +17,8 @@
 #include "../kernel/drivers/ata.h"
 #include "../kernel/fs/fat32.h"
 #include "../kernel/fs/fs.h"
-#include "neodeck_abi.h"
+#include "vista_abi.h"
 
-// ---------------------------------------------------------------- stubs
 static FILE* g_disk = nullptr;
 static uint32_t g_sectors = 0;
 static unsigned g_writes = 0;
@@ -104,7 +103,6 @@ static bool has(const std::vector<std::string>& v, const char* n) {
     return false;
 }
 
-// tests
 static void test_mount_python_image() {
     printf("[1] mount an image made by tools/fat32img.py\n");
     sh("python3 tools/fat32img.py create /tmp/a.img 64 > /dev/null");
@@ -115,7 +113,7 @@ static void test_mount_python_image() {
     CHECK(has(root, "home") && has(root, "bin") && has(root, "readme.txt"));
     CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);
     auto rd = readback("readme.txt");
-    CHECK(rd.size() == 207 && memcmp(rd.data(), "Welcome to NeoDeck OS!", 22) == 0);
+    CHECK(rd.size() == 205 && memcmp(rd.data(), "Welcome to Vista OS!", 20) == 0);
     auto h = readback("/bin/host.txt");
     CHECK(h.size() == 19 && memcmp(h.data(), "hello from the host", 19) == 0);
     CHECK_EQ(fat32_chdir("bin"), FAT_OK);
@@ -124,7 +122,7 @@ static void test_mount_python_image() {
     CHECK_EQ(fat32_chdir(".."), FAT_OK);
     CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);
     uint32_t total = fat32_total_clusters();
-    CHECK(total > 65525);   // a "real" FAT32 by cluster count
+    CHECK(total > 65525);
     CHECK(fat32_free_clusters() < total);
 }
 
@@ -132,14 +130,13 @@ static void test_format_and_python_agrees() {
     printf("[2] kernel format -> python fsck + listing\n");
     sh("rm -f /tmp/b.img; truncate -s 64M /tmp/b.img");
     open_disk("/tmp/b.img");
-    CHECK_EQ(fat32_mount(), FAT_E_NOFS);                       // blank disk
-    CHECK_EQ(fat32_format("NEODECK", 0x1234), FAT_OK);
+    CHECK_EQ(fat32_mount(), FAT_E_NOFS);
+    CHECK_EQ(fat32_format("VISTA", 0x1234), FAT_OK);
     CHECK(fat32_is_mounted());
     py_check("/tmp/b.img", "format");
     CHECK_EQ(sh_rc("python3 tools/fat32img.py ls /tmp/b.img | grep -q readme.txt"), 0);
-    CHECK_EQ(sh_rc("python3 tools/fat32img.py cat /tmp/b.img /readme.txt | grep -q 'Welcome to NeoDeck OS'"), 0);
+    CHECK_EQ(sh_rc("python3 tools/fat32img.py cat /tmp/b.img /readme.txt | grep -q 'Welcome to Vista OS'"), 0);
     CHECK_EQ(sh_rc("file /tmp/b.img | grep -q 'FAT (32 bit)'"), 0);
-    // remount from disk: everything must come back
     CHECK_EQ(fat32_mount(), FAT_OK);
     CHECK(has(list(), "home") && has(list(), "tmp"));
 }
@@ -154,15 +151,15 @@ static void test_dirs_and_paths() {
     CHECK_EQ(strcmp(fat32_cwd(), "/home/user/docs"), 0);
     CHECK_EQ(fat32_chdir("../.."), FAT_OK);
     CHECK_EQ(strcmp(fat32_cwd(), "/home"), 0);
-    CHECK_EQ(fat32_chdir("USER/./docs/../docs"), FAT_OK);       // case-insensitive, "." and ".."
-    CHECK_EQ(strcmp(fat32_cwd(), "/home/user/docs"), 0);        // canonical text uses real names
+    CHECK_EQ(fat32_chdir("USER/./docs/../docs"), FAT_OK);
+    CHECK_EQ(strcmp(fat32_cwd(), "/home/user/docs"), 0);
     CHECK_EQ(fat32_chdir("/"), FAT_OK);
     CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);
-    CHECK_EQ(fat32_chdir(".."), FAT_OK);                         // ".." at the root stays at the root
+    CHECK_EQ(fat32_chdir(".."), FAT_OK);
     CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);
     CHECK_EQ(fat32_chdir("readme.txt"), FAT_E_NOTDIR);
     CHECK_EQ(fat32_chdir("missing"), FAT_E_NOTFOUND);
-    CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);                       // failed cd leaves cwd alone
+    CHECK_EQ(strcmp(fat32_cwd(), "/"), 0);
 
     // ".." entry of a subdirectory directly under the root must be cluster 0
     fat32_dirent e;
@@ -183,12 +180,11 @@ static void test_files() {
     CHECK_EQ(fat32_stat("empty.txt", &e), FAT_OK);
     CHECK(e.size == 0 && e.cluster == 0);
 
-    const char* msg = "hello neodeck";
-    CHECK_EQ(fat32_write_file("hello.txt", msg, strlen(msg)), FAT_OK);       // write creates
+    const char* msg = "hello vista";
+    CHECK_EQ(fat32_write_file("hello.txt", msg, strlen(msg)), FAT_OK);
     auto rd = readback("hello.txt");
     CHECK(rd.size() == strlen(msg) && memcmp(rd.data(), msg, rd.size()) == 0);
 
-    // multi-cluster payloads of awkward sizes, including exact sector multiples
     uint32_t sizes[] = {1, 511, 512, 513, 1024, 4096, 70000, 300000};
     for (uint32_t i = 0; i < sizeof(sizes)/sizeof(sizes[0]); i++) {
         auto data = pattern(sizes[i], i + 1);
@@ -198,7 +194,6 @@ static void test_files() {
     }
     py_check("/tmp/b.img", "multi-size overwrite");
 
-    // shrink to empty releases the chain
     uint32_t free_before = fat32_free_clusters();
     CHECK_EQ(fat32_write_file("big.bin", "", 0), FAT_OK);
     CHECK(fat32_free_clusters() > free_before);
@@ -206,23 +201,20 @@ static void test_files() {
     CHECK_EQ(fat32_stat("big.bin", &e), FAT_OK);
     CHECK(e.size == 0 && e.cluster == 0);
 
-    // absolute path write/read from another cwd
     CHECK_EQ(fat32_chdir("/"), FAT_OK);
     CHECK_EQ(fat32_write_file("/home/user/docs/note.txt", "abs", 3), FAT_OK);
     CHECK(readback("home/user/docs/note.txt").size() == 3);
 
-    // remove
     CHECK_EQ(fat32_remove("/home/user/hello.txt"), FAT_OK);
     CHECK_EQ(fat32_stat("/home/user/hello.txt", &e), FAT_E_NOTFOUND);
     CHECK_EQ(fat32_remove("/home/user/hello.txt"), FAT_E_NOTFOUND);
     CHECK_EQ(fat32_remove("/home/user/docs"), FAT_E_ISDIR);
     CHECK_EQ(fat32_write_file("/home/user/docs", "x", 1), FAT_E_ISDIR);
 
-    // rmdir rules
     CHECK_EQ(fat32_rmdir("/home/user/docs"), FAT_E_NOTEMPTY);
     CHECK_EQ(fat32_remove("/home/user/docs/note.txt"), FAT_OK);
     CHECK_EQ(fat32_chdir("/home/user/docs"), FAT_OK);
-    CHECK_EQ(fat32_rmdir("/home/user/docs"), FAT_E_BUSY);        // cwd
+    CHECK_EQ(fat32_rmdir("/home/user/docs"), FAT_E_BUSY);
     CHECK_EQ(fat32_chdir("/"), FAT_OK);
     CHECK_EQ(fat32_rmdir("/home/user/docs"), FAT_OK);
     CHECK_EQ(fat32_rmdir("readme.txt"), FAT_E_NOTDIR);
@@ -234,7 +226,7 @@ static void test_names() {
     printf("[5] 8.3 name rules and case round-trip\n");
     CHECK_EQ(fat32_chdir("/tmp"), FAT_OK);
     CHECK_EQ(fat32_create("readme.txt"), FAT_OK);
-    CHECK_EQ(fat32_create("README.TXT"), FAT_E_EXISTS);          // case-insensitive
+    CHECK_EQ(fat32_create("README.TXT"), FAT_E_EXISTS);
     CHECK_EQ(fat32_create("UPPER.BIN"), FAT_OK);
     CHECK_EQ(fat32_create("Mixed.txt"), FAT_E_NAME);
     CHECK_EQ(fat32_create("toolongname.txt"), FAT_E_NAME);
@@ -275,7 +267,7 @@ static void test_directory_growth() {
         CHECK_EQ(fat32_remove(name), FAT_OK);
     }
     CHECK_EQ(list().size(), 50);
-    for (int i = 0; i < 20; i++) {                       // fills the holes, must not grow further
+    for (int i = 0; i < 20; i++) {
         snprintf(name, sizeof name, "g%03d.txt", i);
         CHECK_EQ(fat32_create(name), FAT_OK);
     }
@@ -290,24 +282,24 @@ static void test_front_end() {
     fs_write("t.txt", "front end");
     CHECK_EQ(fs_file_size("t.txt"), 9);
     CHECK_EQ(fs_file_size("missing"), 0);
-    CHECK_EQ(fs_file_size("/home"), 0);                   // directory
+    CHECK_EQ(fs_file_size("/home"), 0);
     char buf[32];
     CHECK_EQ(fs_read_to_buffer("t.txt", buf, sizeof buf), 9);
     CHECK_EQ(strcmp(buf, "front end"), 0);
-    CHECK_EQ(fs_read_to_buffer("t.txt", buf, 5), 4);       // truncates, keeps room for the NUL
+    CHECK_EQ(fs_read_to_buffer("t.txt", buf, 5), 4);
     CHECK_EQ(strcmp(buf, "fron"), 0);
     CHECK_EQ(fs_read_to_buffer("missing", buf, sizeof buf), 0);
     CHECK_EQ(buf[0], 0);
 
-    neodeck_dirent ents[8];
+    vista_dirent ents[8];
     int n = fs_get_dir_entries(ents, 8);
     CHECK(n >= 2);
     bool found_t = false;
     for (int i = 0; i < n; i++) if (strcmp(ents[i].name, "t.txt") == 0) { found_t = (ents[i].size == 9 && !ents[i].is_dir); }
     CHECK(found_t);
-    CHECK_EQ(fs_get_dir_entries(ents, 1), 1);              // honours max
+    CHECK_EQ(fs_get_dir_entries(ents, 1), 1);
 
-    neodeck_stat st;
+    vista_stat st;
     CHECK_EQ(fs_stat("t.txt", &st), 0);
     CHECK(st.size == 9 && !st.is_dir);
     CHECK_EQ(fs_stat("/home", &st), 0);
@@ -318,7 +310,6 @@ static void test_front_end() {
     CHECK(fs_remove_quiet("t.txt") != 0);
     CHECK_EQ(fat32_chdir("/"), FAT_OK);
 
-    // the old shell flows still work through the wrappers
     g_quiet = true;
     fs_ls(); fs_cd("home"); fs_mkdir("x"); fs_touch("y"); fs_write("y", "z"); fs_cat("y");
     fs_rm("y"); fs_rmdir("x"); fs_cd(".."); fs_df();
@@ -361,12 +352,11 @@ static void test_lfn() {
     CHECK(has(n, "Long File Name Example.txt"));
     CHECK(has(n, "A name that is quite a bit longer than thirteen characters.dat"));
     CHECK(has(n, "readme.txt"));
-    CHECK_EQ(n.size(), 8);                                   // 5 dirs + readme + 2 long files
-    auto d = readback("long file name example.txt");        // case-insensitive long name
+    CHECK_EQ(n.size(), 8);
+    auto d = readback("long file name example.txt");
     CHECK(d.size() == 17 && memcmp(d.data(), "long name payload", 17) == 0);
-    d = readback("LONGFI~1.TXT");                            // 8.3 alias
+    d = readback("LONGFI~1.TXT");
     CHECK(d.size() == 17);
-    // rewriting a long-named file keeps the name (no new 8.3 entry)
     CHECK_EQ(fat32_write_file("Long File Name Example.txt", "rewritten", 9), FAT_OK);
     CHECK_EQ(readback("Long File Name Example.txt").size(), 9);
     CHECK_EQ(list().size(), 8);
@@ -375,7 +365,7 @@ static void test_lfn() {
     CHECK_EQ(fat32_remove("A name that is quite a bit longer than thirteen characters.dat"), FAT_OK);
     CHECK_EQ(list().size(), 6);
     py_check("/tmp/l.img", "LFN delete");
-    CHECK_EQ(sh_rc("python3 tools/fat32img.py ls /tmp/l.img | grep -qi 'long'"), 1);   // really gone
+    CHECK_EQ(sh_rc("python3 tools/fat32img.py ls /tmp/l.img | grep -qi 'long'"), 1);
 }
 
 static void test_disk_full() {
@@ -386,17 +376,15 @@ static void test_disk_full() {
     uint32_t free0 = fat32_free_clusters();
     std::vector<uint8_t> big(4 * 1024 * 1024, 0xAB);
     CHECK_EQ(fat32_write_file("huge.bin", big.data(), big.size()), FAT_E_FULL);
-    CHECK_EQ(fat32_free_clusters(), free0);                  // everything handed back
+    CHECK_EQ(fat32_free_clusters(), free0);
     py_check("/tmp/s.img", "failed big write");
-    // fill nearly everything, then replace the file with a smaller one
     std::vector<uint8_t> most((free0 - 8) * 512, 0xCD);
     CHECK_EQ(fat32_write_file("most.bin", most.data(), most.size()), FAT_OK);
     CHECK(fat32_free_clusters() == 8);
     CHECK_EQ(fat32_write_file("more.bin", big.data(), 100000), FAT_E_FULL);
-    CHECK_EQ(fat32_write_file("most.bin", most.data(), 1000), FAT_OK);   // replace frees first
+    CHECK_EQ(fat32_write_file("most.bin", most.data(), 1000), FAT_OK);
     py_check("/tmp/s.img", "nearly full");
     CHECK_EQ(fat32_mkdir("d1"), FAT_OK);
-    // tiny disks are formattable; refuse absurdly small ones
     sh("rm -f /tmp/t.img; truncate -s 1M /tmp/t.img");
     open_disk("/tmp/t.img");
     CHECK_EQ(fat32_format("T", 1), FAT_E_INVAL);
@@ -420,7 +408,6 @@ static void test_mbr_partition() {
     CHECK(has(list(), "readme.txt"));
     CHECK_EQ(fat32_write_file("/home/inpart.txt", "partition ok", 12), FAT_OK);
     CHECK_EQ(readback("/home/inpart.txt").size(), 12);
-    // the MBR itself must be untouched and the data must have landed inside the partition
     sh("python3 - <<'PY'\n"
        "d = open('/tmp/p.img','rb').read()\n"
        "assert d[510:512] == b'\\x55\\xAA' and d[446+4] == 0x0C\n"
@@ -429,7 +416,6 @@ static void test_mbr_partition() {
        "open('/tmp/p_extract.img','wb').write(d[2048*512:])\n"
        "PY");
     py_check("/tmp/p_extract.img", "MBR partition write");
-    // garbage disk is rejected
     sh("head -c 1048576 /dev/urandom > /tmp/g.img");
     open_disk("/tmp/g.img");
     CHECK_EQ(fat32_mount(), FAT_E_NOFS);

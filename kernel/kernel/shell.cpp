@@ -56,7 +56,7 @@ void shell_handle_char(char c) {
     }
 }
 
-void neodeck_meminfo() {
+void vista_meminfo() {
     uint32_t used_blocks = 0;
 
     for (int i = 0; i < allocation_bitmap_size; i++) {
@@ -72,7 +72,7 @@ void neodeck_meminfo() {
     uint32_t used_heap_bytes  = used_blocks * BLOCK_SIZE;
     uint32_t free_heap_bytes  = total_heap_bytes - used_heap_bytes;
 
-    kprint_info("NeoDeck Heap Memory Diagnostics:\n");
+    kprint_info("Vista Heap Memory Diagnostics:\n");
     kprint_info("  Total Heap Space: ");
     
     kprint_dec(total_heap_bytes / 1024); kprint_info(" KB\n  Used Heap Space:  ");
@@ -83,7 +83,7 @@ void neodeck_meminfo() {
 
 void parse_command(const char* cmd) {
     if (kstrcmp(cmd, "help") == 0) {
-        kprint("NeoDeck OS Supported Commands:\n");
+        kprint("Vista OS Supported Commands:\n");
         kprint("  help      - Display this menu\n");
         kprint("  clear     - Flush the terminal screen\n");
         kprint("  format    - Wipe the hard disk and create a fresh FAT32 filesystem\n");
@@ -173,14 +173,14 @@ void parse_command(const char* cmd) {
         timer_sleep_ms(katou(cmd + 6));
     }
     else if (kstrncmp(cmd, "meminfo", 7) == 0) {
-        neodeck_meminfo();
+        vista_meminfo();
     }
     else if (kstrncmp(cmd, "panic", 5) == 0) { // COMMAND TO TEST KERNEL PANIC
         int which = (cmd[5] == ' ') ? (int)katou(cmd + 6) : 0;
-        if (which == 0) {            // #DE divide error
+        if (which == 0) {
             volatile int zero = 0;
             asm volatile("div %0" : : "r"(zero), "a"(1), "d"(0));
-        } else if (which == 1) {     // #UD invalid opcode
+        } else if (which == 1) {
             asm volatile("ud2");
         } else if (which == 2) {     // #PF page fault (address above the 48 MB identity map)
             *(volatile int*)0x40000000 = 1;
@@ -218,7 +218,7 @@ void parse_command(const char* cmd) {
         else fs_cat(filename);
     }
     else {
-        kprint_error("NeoDeck Error: Command '");
+        kprint_error("Vista Error: Command '");
         kprint(cmd);
         kprint_error("' not recognized.\n");
     }
@@ -228,9 +228,8 @@ void parse_command(const char* cmd) {
     kprint("> ");
 }
 
-
 void shell_main() {
-    task_set_shell(task_current_pid());          /* the shell owns the keyboard by default */
+    task_set_shell(task_current_pid());
 
     kprint("System ready. Type 'help' for a list of supported commands.\n");
     kprint("\n/> ");

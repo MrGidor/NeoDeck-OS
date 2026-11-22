@@ -1,4 +1,4 @@
-# Multitasking in NeoDeck
+# Multitasking in Vista
 
 Several apps can be loaded at once, each in its **own physical RAM and its own
 address space**, and the timer interrupt switches between them.
@@ -77,7 +77,7 @@ background tasks.
 
 `SYS_YIELD`, `SYS_GETPID`, `SYS_SPAWN(cmdline, flags)`, `SYS_WAIT(pid, &status)`,
 `SYS_KILL(pid)`. `SYS_EXIT` now ends only the calling task. See
-`builtin/sdk/include/neodeck_abi.h`.
+`builtin/sdk/include/vista_abi.h`.
 
 ## Trying it
 

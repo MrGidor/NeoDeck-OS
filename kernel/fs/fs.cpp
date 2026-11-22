@@ -1,5 +1,5 @@
 #include "../include/types.h"
-#include "neodeck_abi.h"
+#include "vista_abi.h"
 #include "../drivers/terminal.h"
 #include "../drivers/timer.h"
 #include "../drivers/ata.h"
@@ -45,7 +45,7 @@ void fs_init() {
 }
 
 void fs_format() {
-    int r = fat32_format("NEODECK", timer_ticks() ^ 0x4E454F44u);
+    int r = fat32_format("VISTA", timer_ticks() ^ 0x56495354u);
     if (r != FAT_OK) { report(r, "format failed", 0); return; }
     kprint_success("FAT32 filesystem created and mounted.\n");
 }
@@ -98,7 +98,7 @@ void fs_mkdir(const char* path) {
 
 void fs_touch(const char* path) {
     int r = fat32_create(path);
-    if (r == FAT_E_EXISTS) return;                 /* touching an existing file is fine */
+    if (r == FAT_E_EXISTS) return;
     if (r != FAT_OK) { report(r, "touch", path); return; }
     kprint("File '"); kprint(path); kprint("' created.\n");
 }
@@ -176,14 +176,14 @@ uint32_t fs_read_to_buffer(const char* path, char* out, uint32_t max_size) {
     return n;
 }
 
-struct dirent_ctx { neodeck_dirent* out; uint32_t max; uint32_t count; };
+struct dirent_ctx { vista_dirent* out; uint32_t max; uint32_t count; };
 static bool dirent_cb(const fat32_dirent* e, void* c) {
     dirent_ctx* ctx = (dirent_ctx*)c;
     if (ctx->count >= ctx->max) return false;
-    neodeck_dirent* d = &ctx->out[ctx->count++];
+    vista_dirent* d = &ctx->out[ctx->count++];
     int i = 0;
-    for (; i < NEODECK_NAME_MAX && e->name[i]; i++) d->name[i] = e->name[i];
-    for (; i <= NEODECK_NAME_MAX; i++) d->name[i] = '\0';
+    for (; i < VISTA_NAME_MAX && e->name[i]; i++) d->name[i] = e->name[i];
+    for (; i <= VISTA_NAME_MAX; i++) d->name[i] = '\0';
     d->size = e->size;
     d->is_dir = (e->attr & FAT_ATTR_DIR) ? 1 : 0;
     d->reserved[0] = d->reserved[1] = d->reserved[2] = 0;
@@ -192,7 +192,7 @@ static bool dirent_cb(const fat32_dirent* e, void* c) {
 
 int fs_get_dir_entries(void* dest, uint32_t max_entries) {
     dirent_ctx ctx;
-    ctx.out = (neodeck_dirent*)dest;
+    ctx.out = (vista_dirent*)dest;
     ctx.max = max_entries;
     ctx.count = 0;
     if (fat32_list_dir(0, dirent_cb, &ctx) != FAT_OK) return -1;
@@ -203,7 +203,7 @@ int fs_stat(const char* path, void* dest) {
     fat32_dirent e;
     int r = fat32_stat(path, &e);
     if (r != FAT_OK) return r;
-    neodeck_stat* st = (neodeck_stat*)dest;
+    vista_stat* st = (vista_stat*)dest;
     st->size = e.size;
     st->is_dir = (e.attr & FAT_ATTR_DIR) ? 1 : 0;
     st->reserved[0] = st->reserved[1] = st->reserved[2] = 0;

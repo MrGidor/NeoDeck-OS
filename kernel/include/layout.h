@@ -1,8 +1,8 @@
-#ifndef NEODECK_LAYOUT_H
-#define NEODECK_LAYOUT_H
+#ifndef VISTA_LAYOUT_H
+#define VISTA_LAYOUT_H
 
 /*
- * NeoDeck physical memory layout
+ * Vista physical memory layout
  *
  * build.sh turns every simple "#define NAME <number>" line in this file into
  *   Binaries/layout.inc  (NASM:  NAME equ <number>)
@@ -40,17 +40,15 @@
 #define KERNEL_HEAP_START       0x1000000
 #define KERNEL_HEAP_SIZE        0x2000000
 
-/* ---- multitasking ---- */
-#define TASK_MAX                16          /* slot 0 is the idle task */
-#define TASK_KSTACK_SIZE        0x4000      /* kernel stack per task (syscalls, IRQs) */
-#define SCHED_SLICE_TICKS       2           /* PIT ticks (10 ms each) before preemption */
+#define TASK_MAX                16
+#define TASK_KSTACK_SIZE        0x4000
+#define SCHED_SLICE_TICKS       2
 
-#define APP_VIRT_BASE           0x40000000  /* where every app is linked and mapped */
-#define APP_MEM_SIZE            0x80000     /* private RAM per app: image + bss + heap + stack */
-#define APP_STACK_SIZE          0x8000      /* the top of that RAM holds the app's stack (+argv) */
+#define APP_VIRT_BASE           0x40000000
+#define APP_MEM_SIZE            0x80000
+#define APP_STACK_SIZE          0x8000
 
 #ifdef __cplusplus
-/* Compile-time checks so the numbers above cannot drift apart. */
 #define PAGING_MAPPED_BYTES     (PAGING_TABLE_COUNT * 0x400000)
 static_assert(PAGE_TABLE_0_ADDRESS == PAGE_DIRECTORY_ADDRESS + 0x1000,
               "page tables must follow the page directory");

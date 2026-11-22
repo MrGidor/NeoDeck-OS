@@ -21,12 +21,12 @@ void     task_switch(uint32_t* old_esp, uint32_t new_esp);
 void     task_user_entry_stub();
 void     task_kthread_entry_stub();
 
-uint32_t arch_irq_save();               /* returns EFLAGS, interrupts now disabled */
+uint32_t arch_irq_save();
 void     arch_irq_restore(uint32_t flags);
 void     arch_irq_enable();
-void     arch_halt();                   /* sti; hlt */
+void     arch_halt();
 void     arch_load_cr3(uint32_t page_directory);
-void     arch_set_kernel_stack(uint32_t esp0);   /* TSS.ESP0 for the next ring3->ring0 entry */
+void     arch_set_kernel_stack(uint32_t esp0);
 
 /* Provided by task.cpp, called from the stubs */
 void     task_after_switch();

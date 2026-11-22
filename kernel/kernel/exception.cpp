@@ -14,9 +14,9 @@ struct exception_frame {
     uint32_t cr2;
     uint32_t edi, esi, ebp, esp_pusha, ebx, edx, ecx, eax;
     uint32_t vector;
-    uint32_t error_code;      /* real one, or 0 for exceptions without one */
+    uint32_t error_code;
     uint32_t eip, cs, eflags;
-    uint32_t user_esp, user_ss;   /* only valid when the fault came from ring 3 */
+    uint32_t user_esp, user_ss;
 };
 
 static const char* const exception_names[32] = {
@@ -38,7 +38,7 @@ static const char* const exception_names[32] = {
 
 #define PANIC_COLS  80
 #define PANIC_ROWS  25
-#define PANIC_ATTR  0x4F            /* white on red */
+#define PANIC_ATTR  0x4F
 
 static volatile uint16_t* const vga = (volatile uint16_t*)0xB8000;
 static int p_row, p_col;
@@ -75,7 +75,7 @@ extern "C" __attribute__((cdecl)) void exception_handler(exception_frame* f) {
         vga[i] = (uint16_t)((PANIC_ATTR << 8) | ' ');
     p_row = p_col = 0;
 
-    p_str("*** NEODECK KERNEL PANIC ***\n\n");
+    p_str("*** VISTA KERNEL PANIC ***\n\n");
 
     p_str("Exception ");  p_hex(f->vector);
     p_str(": ");

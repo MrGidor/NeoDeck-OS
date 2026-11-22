@@ -26,17 +26,17 @@ static volatile bool ctrl_c    = false;
 static void keyboard_irq() {
     uint8_t scancode = inb(0x60);
 
-    if (scancode == 0x1D) { ctrl_down = true;  return; }    /* Ctrl press   */
-    if (scancode == 0x9D) { ctrl_down = false; return; }    /* Ctrl release */
-    if (scancode & 0x80) return;                    /* key release */
-    if (ctrl_down && scancode == 0x2E) { ctrl_c = true; return; }   /* Ctrl+C */
-    if (scancode >= sizeof(keyboard_map)) return;   /* extended / unmapped */
+    if (scancode == 0x1D) { ctrl_down = true;  return; }
+    if (scancode == 0x9D) { ctrl_down = false; return; }
+    if (scancode & 0x80) return;
+    if (ctrl_down && scancode == 0x2E) { ctrl_c = true; return; }
+    if (scancode >= sizeof(keyboard_map)) return;
 
     char c = keyboard_map[scancode];
     if (c == 0) return;
 
     uint32_t next = (head + 1) & (KEYBOARD_BUFFER_SIZE - 1);
-    if (next == tail) return;                       /* full: drop the key */
+    if (next == tail) return;
 
     buffer[head] = c;
     head = next;
@@ -65,7 +65,7 @@ void keyboard_ctrl_c_clear()   { ctrl_c = false; }
 
 char keyboard_get_char() {
     while (!keyboard_has_chars()) {
-        if (task_scheduler_active()) task_block_on_key();   /* sleep until IRQ1 queues a key */
+        if (task_scheduler_active()) task_block_on_key();
         else asm volatile("sti; hlt");                      /* early boot: no scheduler yet */
     }
     return keyboard_pop_char();

@@ -1,4 +1,4 @@
-#include "neodeck.h"
+#include "vista.h"
 
 /*
  * burner <label> [seconds]

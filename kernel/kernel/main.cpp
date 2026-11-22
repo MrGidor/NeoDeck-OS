@@ -21,7 +21,7 @@ extern "C" void enable_paging(uint32_t page_directory_address);
 extern "C" void main() {
     terminal_clear();
 
-    kprint("Booting NeoDeck...\n");
+    kprint("Booting Vista...\n");
     kprint_log("Kernel .bss cleared, stack ready.\n");
 
     gdt_init();

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-fat32img.py - create / inspect / modify FAT32 disk images for NeoDeck-OS
+fat32img.py - create / inspect / modify FAT32 disk images for Vista-OS
 without root and without mtools.
 
     fat32img.py create IMG [SIZE_MB=64]       new image (same layout as the kernel's `format`)
@@ -18,12 +18,10 @@ import sys
 SECTOR = 512
 EOC = 0x0FFFFFF8
 EOC_MARK = 0x0FFFFFFF
-DEFAULT_DATE = 0x5821   # 2024-01-01
-
+DEFAULT_DATE = 0x5821
 
 class FatError(Exception):
     pass
-
 
 class Fat32:
     def __init__(self, path, writable=False):
@@ -46,7 +44,6 @@ class Fat32:
                     for i in range(self.clusters + 2)] if False else None
         self._load_fat()
 
-    # ---- raw io -------------------------------------------------------
     def read_sector(self, lba):
         self.f.seek(lba * SECTOR)
         d = self.f.read(SECTOR)
@@ -60,7 +57,6 @@ class Fat32:
     def cluster_lba(self, c):
         return self.data_lba + (c - 2) * self.spc
 
-    # ---- FAT ----------------------------------------------------------
     def _load_fat(self):
         self.f.seek(self.reserved * SECTOR)
         raw = self.f.read(self.fat_size * SECTOR)
@@ -92,7 +88,6 @@ class Fat32:
                 return c
         raise FatError("disk full")
 
-    # ---- directories --------------------------------------------------
     def read_dir_raw(self, cluster):
         """yield (lba, offset, 32-byte entry) for every slot of the directory"""
         for c in self.chain(cluster):
@@ -275,10 +270,8 @@ class Fat32:
         self.write_sector(self.fsinfo, bytes(s))
         self.f.flush()
 
-    # ---- fsck ---------------------------------------------------------
     def check(self):
         problems = []
-        # both FAT copies identical
         self.f.seek(self.reserved * SECTOR)
         f1 = self.f.read(self.fat_size * SECTOR)
         for i in range(1, self.nfats):
@@ -332,7 +325,6 @@ class Fat32:
             problems.append("FSInfo free count %d != real %d" % (fc, self.free_count()))
         return problems
 
-
 def create(path, size_mb=64):
     total = size_mb * 1024 * 1024 // SECTOR
     spc, reserved, nfats = 1, 32, 2
@@ -345,7 +337,7 @@ def create(path, size_mb=64):
         f.truncate(total * SECTOR)
         bs = bytearray(SECTOR)
         bs[0:3] = b"\xEB\x58\x90"
-        bs[3:11] = b"NEODECK "
+        bs[3:11] = b"VISTA   "
         struct.pack_into("<HBHBHHBHHHI", bs, 11, SECTOR, spc, reserved, nfats, 0, 0, 0xF8, 0, 63, 255, 0)
         struct.pack_into("<I", bs, 32, total)
         struct.pack_into("<I", bs, 36, fat_size)
@@ -353,8 +345,8 @@ def create(path, size_mb=64):
         struct.pack_into("<HH", bs, 48, 1, 6)
         bs[64] = 0x80
         bs[66] = 0x29
-        struct.pack_into("<I", bs, 67, 0x4E454F44)
-        bs[71:82] = b"NEODECK    "
+        struct.pack_into("<I", bs, 67, 0x56495354)
+        bs[71:82] = b"VISTA      "
         bs[82:90] = b"FAT32   "
         bs[510:512] = b"\x55\xAA"
         fi = bytearray(SECTOR)
@@ -374,11 +366,10 @@ def create(path, size_mb=64):
     for d in ("home", "bin", "etc", "var", "tmp"):
         fs.mkdir("/" + d)
     fs.put("/readme.txt",
-           b"Welcome to NeoDeck OS! This is a simple text file created on the root directory "
+           b"Welcome to Vista OS! This is a simple text file created on the root directory "
            b"of your FAT32 virtual disk. Feel free to explore the filesystem, create new "
            b"directories and files, and write your own content.\n")
     return fs
-
 
 def main(argv):
     if len(argv) < 3:
@@ -419,7 +410,6 @@ def main(argv):
         print("error:", e)
         return 1
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
