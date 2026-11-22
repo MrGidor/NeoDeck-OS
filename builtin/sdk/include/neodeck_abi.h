@@ -5,17 +5,26 @@
  * Kernel <-> app ABI. Included by BOTH the kernel and the SDK, so syscall
  * numbers and on-disk constants cannot drift between the two sides.
  *
- * Syscall convention: `int 0x80`, EAX = number, EBX/ECX = arguments,
- * result (if any) comes back in EAX.
+ * Syscall convention: `int 0x80` from ring 3, EAX = number, EBX/ECX/EDX =
+ * arguments, result (if any) comes back in EAX.
+ *
+ * App memory model: every app is linked at NEODECK_APP_BASE and runs in ring 3
+ * in its own address space (its private RAM is mapped there), so apps never see
+ * each other's memory. The kernel rejects pointers outside that window.
+ *   [ image | .bss ........ free ........ | stack (grows down) + argv ]
  *
  * App entry convention: the first byte of the binary is
  *     int entry(int argc, char** argv)        (cdecl)
  * Returning from it is the same as calling sys_exit(return value).
+ * A task killed by a CPU exception exits with status 1000 + vector.
  */
+
+#define NEODECK_APP_BASE   0x40000000   /* = APP_VIRT_BASE in kernel/include/layout.h */
+#define NEODECK_APP_SIZE   0x80000      /* = APP_MEM_SIZE */
 
 #define NEODECK_SYS_PRINT              1
 #define NEODECK_SYS_CLEAR              2
-#define NEODECK_SYS_GET_KEY            3   /* blocks until a key arrives */
+#define NEODECK_SYS_GET_KEY            3   /* blocks until a key arrives; returns 0 at once if the caller is not the foreground task */
 #define NEODECK_SYS_READ_FILE          4   /* EBX=path, ECX=buffer, EDX=buffer size; returns bytes read (NUL-terminated) */
 #define NEODECK_SYS_GET_DIR_ENTRIES    5   /* EBX=neodeck_dirent[], ECX=max entries; returns count, -1 on error */
 #define NEODECK_SYS_MKDIR              6
@@ -31,6 +40,13 @@
 #define NEODECK_SYS_REMOVE            16   /* EBX=path, deletes a file; 0 = ok */
 #define NEODECK_SYS_RMDIR             17   /* EBX=path, deletes an empty directory; 0 = ok */
 #define NEODECK_SYS_STAT              18   /* EBX=path, ECX=neodeck_stat*; 0 = ok, negative = error */
+#define NEODECK_SYS_YIELD             19   /* give the CPU to the next ready task */
+#define NEODECK_SYS_GETPID            20   /* returns the caller's pid */
+#define NEODECK_SYS_SPAWN             21   /* EBX="file arg1 arg2", ECX=flags; returns pid, negative = error */
+#define NEODECK_SYS_WAIT              22   /* EBX=pid, ECX=int* status (or 0); blocks until it exits; 0 = ok, -1 = not waitable */
+#define NEODECK_SYS_KILL              23   /* EBX=pid; 0 = ok */
+
+#define NEODECK_SPAWN_DETACH  1            /* nobody will sys_wait() for the child */
 
 /* Filesystem: FAT32. Names are returned as plain ASCII (long names are cut at 127 chars). */
 #define NEODECK_NAME_MAX  127

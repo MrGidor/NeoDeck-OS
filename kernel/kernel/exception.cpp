@@ -1,5 +1,5 @@
 #include "../include/types.h"
-#include "execve.h"
+#include "task.h"
 
 /*
  * CPU exception handler / panic screen.
@@ -16,6 +16,7 @@ struct exception_frame {
     uint32_t vector;
     uint32_t error_code;      /* real one, or 0 for exceptions without one */
     uint32_t eip, cs, eflags;
+    uint32_t user_esp, user_ss;   /* only valid when the fault came from ring 3 */
 };
 
 static const char* const exception_names[32] = {
@@ -63,6 +64,13 @@ static void p_reg(const char* name, uint32_t v) {
 extern "C" __attribute__((cdecl)) void exception_handler(exception_frame* f) {
     asm volatile("cli");
 
+    /* A ring-3 task misbehaved: that is the task's problem, not the kernel's.
+     * Report it on the normal console and terminate just that task. (We are on
+     * the panic stack here; task_exit() abandons it by switching to another
+     * task, so the stack is free again for the next exception.) */
+    if ((f->cs & 3) == 3 && task_current_is_user())
+        task_handle_user_fault(f->vector, f->eip, f->cr2, f->error_code);
+
     for (int i = 0; i < PANIC_COLS * PANIC_ROWS; i++)
         vga[i] = (uint16_t)((PANIC_ATTR << 8) | ' ');
     p_row = p_col = 0;
@@ -97,11 +105,9 @@ extern "C" __attribute__((cdecl)) void exception_handler(exception_frame* f) {
         p_str("\n");
     }
 
-    if (exec_app_running()) {
-        uint32_t base = exec_app_base();
-        p_str("\nFault inside a running app. Base "); p_hex(base);
-        p_str(", EIP offset "); p_hex(f->eip - base);
-        p_str("\n");
+    if (task_scheduler_active()) {
+        p_str("\nRunning task: pid "); p_hex(task_current_pid());
+        p_str(" ("); p_str(task_current_name()); p_str(")\n");
     }
 
     p_str("\nRegisters:\n");

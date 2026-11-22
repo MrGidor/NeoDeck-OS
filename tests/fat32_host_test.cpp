@@ -56,7 +56,6 @@ void kprint_error(const char* s) { kprint(s); }
 void kprint_info(const char* s) { kprint(s); }
 void kprint_dec(uint32_t v) { if (!g_quiet) printf("%u", v); }
 
-// ---------------------------------------------------------------- tiny test framework
 static int g_fail = 0, g_pass = 0;
 #define CHECK(cond) do { if (cond) g_pass++; else { g_fail++; printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); } } while (0)
 #define CHECK_EQ(a, b) do { long _a = (long)(a), _b = (long)(b); if (_a == _b) g_pass++; else { g_fail++; printf("  FAIL %s:%d: %s == %s  (%ld vs %ld)\n", __FILE__, __LINE__, #a, #b, _a, _b); } } while (0)
@@ -105,7 +104,7 @@ static bool has(const std::vector<std::string>& v, const char* n) {
     return false;
 }
 
-// ---------------------------------------------------------------- tests
+// tests
 static void test_mount_python_image() {
     printf("[1] mount an image made by tools/fat32img.py\n");
     sh("python3 tools/fat32img.py create /tmp/a.img 64 > /dev/null");

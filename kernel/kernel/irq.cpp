@@ -1,6 +1,7 @@
 #include "irq.h"
 #include "../drivers/io.h"
 #include "../drivers/pic.h"
+#include "task.h"
 
 static irq_handler_t irq_handlers[16];
 
@@ -8,8 +9,9 @@ void irq_install_handler(uint8_t irq, irq_handler_t handler) {
     if (irq < 16) irq_handlers[irq] = handler;
 }
 
-/* Called from irq_common in kernel_entry.asm with the IRQ number (0-15). */
-extern "C" __attribute__((cdecl)) void irq_dispatch(uint32_t irq) {
+/* Called from irq_common in kernel_entry.asm with the IRQ number (0-15) and a
+ * pointer to the saved registers / interrupt frame. */
+extern "C" __attribute__((cdecl)) void irq_dispatch(uint32_t irq, irq_frame* frame) {
     if (irq == 7 || irq == 15) {
         if (pic_is_spurious((uint8_t)irq)) {
             /* Spurious: never EOI the line itself, but the master must be
@@ -22,4 +24,8 @@ extern "C" __attribute__((cdecl)) void irq_dispatch(uint32_t irq) {
     if (irq < 16 && irq_handlers[irq]) irq_handlers[irq]();
 
     pic_send_eoi((uint8_t)irq);
+
+    /* Preemption point. Must come after the EOI: the task we switch away from
+     * may not run again for a while and the PIC must keep delivering IRQ0. */
+    if (irq == 0) task_timer_tick((frame->cs & 3) == 3);
 }

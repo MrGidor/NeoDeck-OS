@@ -36,6 +36,25 @@ void *kmalloc(int n_blocks) {
     return (void*)0;
 }
 
+void *kmalloc_aligned(int n_blocks, int align_blocks) {
+    if (n_blocks <= 0 || align_blocks <= 0) return (void*)0;
+    int contiguous = 0;
+    int start = 0;
+    for (int i = 0; i < allocation_bitmap_size; i++) {
+        if (contiguous == 0) {
+            if (i % align_blocks != 0) continue;     /* a run may only begin on an aligned block */
+            start = i;
+        }
+        if (get_bitmap(allocation_bitmap, i)) { contiguous = 0; continue; }
+        if (++contiguous >= n_blocks) {
+            for (int j = start; j < start + n_blocks; j++)
+                set_bitmap(allocation_bitmap, j);
+            return (void*)((int)dynamic_mem_loc + start * BLOCK_SIZE);
+        }
+    }
+    return (void*)0;
+}
+
 void kfree(void* ptr, int n_blocks) {
     if (ptr == (void*)0 || n_blocks <= 0) return;
     int start = ((int)ptr - (int)dynamic_mem_loc) / BLOCK_SIZE;
